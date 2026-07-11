@@ -11,6 +11,7 @@ def submit_contact():
     data = request.get_json() or {}
     name = data.get("name", "").strip()
     email = data.get("email", "").strip()
+    phone = data.get("phone", "").strip()
     subject = data.get("subject", "").strip()
     message = data.get("message", "").strip()
 
@@ -21,9 +22,14 @@ def submit_contact():
     if not re.match(r"^[^@]+@[^@]+\.[^@]+$", email):
         return jsonify({"error": "Please enter a valid email address."}), 400
 
+    # Phone is optional, but validate format if the user typed one in
+    if phone and not re.match(r"^[0-9+()\-\s]{6,30}$", phone):
+        return jsonify({"error": "Please enter a valid phone number."}), 400
+
     new_msg = ContactMessage(
         name=name,
         email=email,
+        phone=phone or None,
         subject=subject,
         message=message
     )
@@ -44,7 +50,8 @@ def submit_contact():
                 body=(
                     f"You have received a new contact message on GM Store.\n\n"
                     f"Name: {name}\n"
-                    f"Email: {email}\n\n"
+                    f"Email: {email}\n"
+                    f"Phone: {phone or '—'}\n\n"
                     f"Subject: {subject}\n"
                     f"Message:\n{message}"
                 )
