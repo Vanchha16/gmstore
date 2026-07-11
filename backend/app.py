@@ -22,6 +22,7 @@ from blueprints.payment_payway import payway_payment_bp
 from blueprints.chat import chat_bp
 from blueprints.wallet import wallet_bp
 from blueprints.admin.wallets import admin_wallets_bp
+from blueprints.admin.promo_codes import admin_promo_codes_bp
 
 
 
@@ -41,7 +42,7 @@ def create_app(env: str | None = None) -> Flask:
     cors.init_app(app, resources={r"/api/*": {"origins": app.config["FRONTEND_ORIGIN"]}})
 
     # import all models so Alembic detects them
-    from models import User, OtpCode, Category, Product, ProductImage, StockItem, Favorite, Review, Preorder, Cart, CartItem, Order, OrderItem, Payment, ContactMessage, ChatSession, ChatMessage, Wallet, WalletTransaction, WalletTopup  # noqa: F401
+    from models import User, OtpCode, Category, Product, ProductImage, StockItem, Favorite, Review, Preorder, Cart, CartItem, Order, OrderItem, Payment, ContactMessage, ChatSession, ChatMessage, Wallet, WalletTransaction, WalletTopup, PromoCode, PromoCodeRedemption  # noqa: F401
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
@@ -63,6 +64,7 @@ def create_app(env: str | None = None) -> Flask:
     app.register_blueprint(chat_bp)
     app.register_blueprint(wallet_bp)
     app.register_blueprint(admin_wallets_bp)
+    app.register_blueprint(admin_promo_codes_bp)
 
     socketio.init_app(app)
 

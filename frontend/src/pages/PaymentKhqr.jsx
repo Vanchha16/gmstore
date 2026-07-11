@@ -137,6 +137,12 @@ export default function PaymentKhqr() {
                 <span>Order</span>
                 <span className="font-mono font-semibold text-slate-200">{order.order_number}</span>
               </div>
+              {order.discount > 0 && (
+                <div className="mt-1 flex justify-between text-slate-400">
+                  <span>Discount {order.promo_code ? `(${order.promo_code.code})` : ''}</span>
+                  <span className="font-mono font-semibold text-emerald-400">-${parseFloat(order.discount).toFixed(2)}</span>
+                </div>
+              )}
               <div className="mt-1 flex justify-between text-slate-400">
                 <span>Amount Paid</span>
                 <span className="font-mono font-semibold text-emerald-400">${parseFloat(order.total).toFixed(2)}</span>
@@ -227,6 +233,12 @@ export default function PaymentKhqr() {
                 <span>Amount Due</span>
                 <span className="font-mono font-semibold text-violet-400">${parseFloat(paymentDetails.amount).toFixed(2)}</span>
               </div>
+              {order.discount > 0 && (
+                <div className="flex justify-between">
+                  <span>Discount {order.promo_code ? `(${order.promo_code.code})` : ''}</span>
+                  <span className="font-mono font-semibold text-emerald-400">-${parseFloat(order.discount).toFixed(2)}</span>
+                </div>
+              )}
               {order.wallet_amount > 0 && (
                 <div className="flex justify-between">
                   <span>Wallet Applied</span>

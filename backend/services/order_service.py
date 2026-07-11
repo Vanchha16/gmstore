@@ -1,5 +1,6 @@
 import random
 from datetime import datetime, timezone
+from decimal import Decimal
 from extensions import db
 from models.order import Order
 from models.order_item import OrderItem
@@ -7,6 +8,8 @@ from models.cart import Cart
 from models.payment import Payment
 from models.product import Product
 from models.stock_item import StockItem
+from models.promo_code import PromoCode
+from services import promo_service
 
 
 def generate_order_number():
@@ -28,8 +31,22 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
         raise ValueError("Shopping cart is empty or inactive.")
 
     # Calculate totals
-    subtotal = sum(float(item.unit_price) * item.qty for item in cart.items)
-    discount = 0.0  # Placeholder for future promo codes
+    subtotal = Decimal(str(sum(float(item.unit_price) * item.qty for item in cart.items)))
+
+    # Re-validate any applied promo code inside this same transaction — never trust
+    # the discount the frontend showed at "apply" time, prices/usage may have changed since.
+    promo = None
+    discount = Decimal("0")
+    if cart.promo_code_id:
+        promo = PromoCode.query.filter_by(id=cart.promo_code_id).with_for_update().first()
+        if not promo:
+            raise ValueError("Your promo code is no longer available. Please remove it and try again.")
+        try:
+            promo_service.validate_promo_code(promo, user_id, subtotal)
+        except ValueError as e:
+            raise ValueError(f"Your promo code is no longer valid: {e}")
+        discount = promo_service.compute_discount(promo, subtotal)
+
     total = subtotal - discount
 
     # Generate unique order number
@@ -45,6 +62,7 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
         status="pending_payment",
         subtotal=subtotal,
         discount=discount,
+        promo_code_id=promo.id if promo else None,
         total=total,
         is_preorder=is_preorder
     )
@@ -78,6 +96,12 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
         status="created"
     )
     db.session.add(payment)
+
+    if promo:
+        # Counts as "used" from checkout, not from payment — see promo_service.void_redemption_for_order
+        # for how this gets rolled back if the order is later cancelled unpaid.
+        promo_service.redeem_promo_code(promo, user_id, order.id, subtotal, discount)
+        cart.promo_code_id = None
 
     # Mark cart as converted
     cart.status = "converted"

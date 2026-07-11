@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from './AuthContext'
-import { getCart, addCartItem, updateCartItem, deleteCartItem } from '../api/endpoints'
+import { getCart, addCartItem, updateCartItem, deleteCartItem, applyPromoCode, removePromoCode } from '../api/endpoints'
 
 const CartContext = createContext(null)
 
@@ -69,6 +69,32 @@ export function CartProvider({ children }) {
     }
   }
 
+  const applyPromo = async (code) => {
+    setError(null)
+    try {
+      const { data } = await applyPromoCode(code)
+      setCart(data)
+      return data
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message
+      setError(msg)
+      throw new Error(msg)
+    }
+  }
+
+  const removePromo = async () => {
+    setError(null)
+    try {
+      const { data } = await removePromoCode()
+      setCart(data)
+      return data
+    } catch (err) {
+      const msg = err.response?.data?.error || err.message
+      setError(msg)
+      throw new Error(msg)
+    }
+  }
+
   const cartCount = cart?.items?.reduce((sum, item) => sum + item.qty, 0) || 0
 
   return (
@@ -81,7 +107,9 @@ export function CartProvider({ children }) {
         refreshCart,
         addToCart,
         updateQty,
-        removeFromCart
+        removeFromCart,
+        applyPromo,
+        removePromo
       }}
     >
       {children}
