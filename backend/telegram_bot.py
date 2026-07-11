@@ -33,6 +33,7 @@ API              = f"https://api.telegram.org/bot{BOT_TOKEN}"
 PRODUCTS_PER_PAGE = 5
 PAYMENT_TIMEOUT   = 600   # 10 minutes to complete payment
 POLL_INTERVAL     = 5     # seconds between Bakong status checks
+MAX_ON_DEMAND_QTY = 10    # same per-line cap as the website cart (blueprints/cart.py)
 
 # In-memory carts:  { chat_id: [{"product_id", "title", "price", "qty"}] }
 carts: dict = {}
@@ -429,7 +430,6 @@ def show_menu(chat_id: int, name: str, msg_id=None):
 def show_products(chat_id: int, msg_id=None, page: int = 0):
     with app.app_context():
         from models.product import Product
-        from models.stock_item import StockItem
 
         all_p = (Product.query.filter_by(status="active")
                  .offset(page * PRODUCTS_PER_PAGE)
@@ -437,10 +437,9 @@ def show_products(chat_id: int, msg_id=None, page: int = 0):
                  .all())
         has_more = len(all_p) > PRODUCTS_PER_PAGE
         products = all_p[:PRODUCTS_PER_PAGE]
-        stock_map = {
-            p.id: StockItem.query.filter_by(product_id=p.id, status="available").count()
-            for p in products
-        }
+        # Same rule as the website: availability is the admin's manual is_available
+        # toggle, never a live stock count — buyers can order on-demand at 0 stock.
+        avail_map = {p.id: p.is_available for p in products}
 
     if not products:
         text = "😔 No products available right now."
@@ -453,7 +452,7 @@ def show_products(chat_id: int, msg_id=None, page: int = 0):
 
     lines = ["🛍 *Available Products* — tap one to view details:\n"]
     for p in products:
-        icon = "✅" if stock_map[p.id] > 0 else "❌"
+        icon = "✅" if avail_map[p.id] else "❌"
         lines.append(f"{icon} *{p.title}* — ${float(p.price):.2f}")
 
     rows = [[( f"🎮 {p.title[:28]}", f"view_{p.id}")] for p in products]
@@ -477,22 +476,21 @@ def show_products(chat_id: int, msg_id=None, page: int = 0):
 def show_product_detail(chat_id: int, msg_id: int, product_id: int):
     with app.app_context():
         from models.product import Product
-        from models.stock_item import StockItem
         p = Product.query.get(product_id)
         if not p:
             edit(chat_id, msg_id, "❌ Product not found.",
                  inline([[("⬅️ Back", "products_0")]]))
             return
-        stock = StockItem.query.filter_by(product_id=p.id, status="available").count()
+        is_available = p.is_available
 
-    icon = "✅" if stock > 0 else "❌ Sold out"
+    icon = "✅ Available" if is_available else "❌ Not Available"
     text = (
         f"🎮 *{p.title}*\n\n"
         f"{(p.description or '').strip()}\n\n"
         f"💰 Price: *${float(p.price):.2f}*\n"
-        f"📦 Stock: {icon} ({stock} available)"
+        f"📦 Status: {icon}"
     )
-    if stock > 0:
+    if is_available:
         kb = inline([
             [("🛒 Add to Cart", f"add_{product_id}")],
             [("⬅️ Back", "products_0"), ("🏠 Menu", "menu")],
@@ -708,12 +706,16 @@ def handle_callback(cb: dict):
         product_id = int(data.split("_", 1)[1])
         with app.app_context():
             from models.product import Product
-            from models.stock_item import StockItem
-            p     = Product.query.get(product_id)
-            stock = StockItem.query.filter_by(product_id=product_id, status="available").count() if p else 0
+            p = Product.query.get(product_id)
+            is_available = p.is_available if p else False
 
-        if not p or stock == 0:
-            answer_cb(cb_id, "❌ Out of stock!", alert=True)
+        if not p or not is_available:
+            answer_cb(cb_id, "❌ Not available!", alert=True)
+            return
+
+        existing_qty = next((i["qty"] for i in carts.get(chat_id, []) if i["product_id"] == p.id), 0)
+        if existing_qty >= MAX_ON_DEMAND_QTY:
+            answer_cb(cb_id, f"❌ Max {MAX_ON_DEMAND_QTY} per order.", alert=True)
             return
 
         cart_add(chat_id, p.id, p.title, float(p.price))
