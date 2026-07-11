@@ -12,7 +12,7 @@ class Order(db.Model):
     order_number = db.Column(db.String(30), unique=True, nullable=False)
     user_id = db.Column(db.BigInteger, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = db.Column(
-        db.Enum("pending_payment", "awaiting_stock", "paid", "fulfilled", "cancelled", "refunded", "failed"),
+        db.Enum("pending_payment", "paid", "fulfilled", "cancelled", "refunded", "failed"),
         nullable=False,
         default="pending_payment"
     )
@@ -31,13 +31,6 @@ class Order(db.Model):
     user = db.relationship("User", backref=db.backref("orders_list", lazy="dynamic", cascade="all, delete-orphan"))
     items = db.relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
     payments = db.relationship("Payment", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
-
-    @property
-    def needs_sourcing(self) -> bool:
-        """True if any line item still has no stock_item attached (and isn't a coming-soon preorder)."""
-        if self.is_preorder:
-            return False
-        return any(item.stock_item_id is None for item in self.items)
 
     def to_dict(self):
         return {

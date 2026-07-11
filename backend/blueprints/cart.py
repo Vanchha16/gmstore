@@ -7,9 +7,9 @@ from models.product import Product
 
 cart_bp = Blueprint("cart", __name__, url_prefix="/api/v1/cart")
 
-# Active products can be bought even at 0 stock (admin sources it after payment —
-# see reserve_or_await_stock / awaiting_stock flow). Still cap qty per line so a
-# single order can't queue up an unbounded sourcing commitment for the admin.
+# Purchasability never depends on real stock counts — the admin's manual is_available
+# toggle gates whether a product can be bought at all. Still cap qty per line so a
+# single order can't queue up an unbounded delivery commitment for the admin.
 MAX_ON_DEMAND_QTY = 10
 
 
@@ -44,6 +44,8 @@ def add_cart_item():
     product = Product.query.get_or_404(product_id)
     if product.status not in ("active", "coming_soon"):
         return jsonify({"error": "Product is not available for purchase."}), 400
+    if product.status == "active" and not product.is_available:
+        return jsonify({"error": "Product is currently not available for purchase."}), 400
 
     cart = get_or_create_active_cart(user_id)
 
@@ -53,14 +55,8 @@ def add_cart_item():
     if item:
         target_qty += item.qty
 
-    # Active products can be bought past available stock — admin sources the shortfall
-    # after payment. Only the on-demand *overflow* is capped, not normal in-stock buys.
-    if product.status == "active":
-        available = product.available_stock
-        if target_qty > available and target_qty > MAX_ON_DEMAND_QTY:
-            return jsonify({
-                "error": f"Only {available} in stock. Max {MAX_ON_DEMAND_QTY} allowed when sourcing on demand."
-            }), 400
+    if product.status == "active" and target_qty > MAX_ON_DEMAND_QTY:
+        return jsonify({"error": f"Max {MAX_ON_DEMAND_QTY} allowed per order."}), 400
 
     if item:
         item.qty = target_qty
@@ -93,11 +89,10 @@ def update_cart_item(item_id):
 
     product = Product.query.get(item.product_id)
     if product and product.status == "active":
-        available = product.available_stock
-        if qty > available and qty > MAX_ON_DEMAND_QTY:
-            return jsonify({
-                "error": f"Only {available} in stock. Max {MAX_ON_DEMAND_QTY} allowed when sourcing on demand."
-            }), 400
+        if not product.is_available:
+            return jsonify({"error": "Product is currently not available for purchase."}), 400
+        if qty > MAX_ON_DEMAND_QTY:
+            return jsonify({"error": f"Max {MAX_ON_DEMAND_QTY} allowed per order."}), 400
 
     item.qty = qty
     db.session.commit()

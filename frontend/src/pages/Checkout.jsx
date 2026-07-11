@@ -21,7 +21,6 @@ export default function Checkout() {
   const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.qty, 0)
   const total = subtotal
   const canPayFullyWithWallet = walletBalance >= total && total > 0
-  const onDemandItems = items.filter(item => item.product?.status === 'active' && item.product?.available_stock === 0)
 
   const handleCheckout = async () => {
     setLoading(true)
@@ -69,14 +68,6 @@ export default function Checkout() {
       {error && (
         <div className="mb-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-400">
           {error}
-        </div>
-      )}
-
-      {onDemandItems.length > 0 && (
-        <div className="mb-6 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-amber-300">
-          ⏳ {onDemandItems.map(i => i.product.title).join(', ')} {onDemandItems.length > 1 ? 'are' : 'is'} currently
-          sourced on demand — we'll acquire {onDemandItems.length > 1 ? 'these items' : 'this item'} after your
-          payment confirms, so delivery may take longer than usual. You'll be notified as soon as it's ready.
         </div>
       )}
 

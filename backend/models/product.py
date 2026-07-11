@@ -22,6 +22,10 @@ class Product(db.Model):
     compare_at_price = db.Column(db.Numeric(10, 2), nullable=True)
     currency = db.Column(db.String(3), nullable=False, default="USD")
     status = db.Column(db.Enum("draft", "coming_soon", "active", "archived"), nullable=False, default="draft")
+    # Manual admin toggle for the buyer-facing Available/Not Available badge — NOT derived
+    # from stock_items. Admin may mark a product available before actually sourcing an
+    # account/key; buyers can buy and pay without knowing real stock counts.
+    is_available = db.Column(db.Boolean, nullable=False, default=True)
     release_date = db.Column(db.DateTime, nullable=True)
     is_featured = db.Column(db.Boolean, nullable=False, default=False)
     delivery_time = db.Column(db.String(100), nullable=True)
@@ -61,6 +65,7 @@ class Product(db.Model):
             "compare_at_price": float(self.compare_at_price) if self.compare_at_price else None,
             "currency": self.currency,
             "status": self.status,
+            "is_available": self.is_available,
             "release_date": self.release_date.isoformat() if self.release_date else None,
             "is_featured": self.is_featured,
             "delivery_time": self.delivery_time,

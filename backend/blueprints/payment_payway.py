@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from extensions import db
 from models.order import Order
-from services.order_service import fulfill_order
+from services.order_service import mark_order_paid
 from services.payway_service import verify_callback_signature
 
 payway_payment_bp = Blueprint("payway_payment", __name__, url_prefix="/api/v1/payment/payway")
@@ -36,11 +36,13 @@ def payway_callback():
             return jsonify({"error": f"Order {tran_id} not found."}), 404
             
         try:
-            fulfill_order(order.id, provider_txn_id=aprov_code or "ABA-TXN-OK", raw_response=payload)
+            # Payment confirmed — order moves to "Pending Delivery". Admin still has to
+            # manually deliver via the Deliver popup, same as every other payment method.
+            mark_order_paid(order.id, provider_txn_id=aprov_code or "ABA-TXN-OK", raw_response=payload)
             # ABA PayWay expectations: return 'OK' or JSON acknowledging success
-            return jsonify({"status": 0, "message": "Order fulfilled successfully."}), 200
+            return jsonify({"status": 0, "message": "Order marked as paid."}), 200
         except Exception as e:
             db.session.rollback()
-            return jsonify({"error": f"Order fulfillment failed: {str(e)}"}), 500
+            return jsonify({"error": f"Order payment confirmation failed: {str(e)}"}), 500
 
     return jsonify({"status": status, "message": "Transaction was not successful."}), 200

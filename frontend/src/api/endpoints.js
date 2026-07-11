@@ -68,7 +68,8 @@ export const adminListOrders = (params) => client.get('/admin/orders', { params 
 export const adminGetOrder = (id) => client.get(`/admin/orders/${id}`)
 export const adminUpdateOrder = (id, data) => client.patch(`/admin/orders/${id}`, data)
 export const adminRefundOrder = (id) => client.post(`/admin/orders/${id}/refund`)
-export const adminDeliverOrder = (id) => client.post(`/admin/orders/${id}/deliver`)
+export const adminGetDeliverable = (id) => client.get(`/admin/orders/${id}/deliverable`)
+export const adminDeliverOrder = (id, resolutions) => client.post(`/admin/orders/${id}/deliver`, { resolutions })
 
 // Wallet (customer)
 export const getWallet = (params) => client.get('/me/wallet', { params })

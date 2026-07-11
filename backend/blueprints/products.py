@@ -12,7 +12,8 @@ def _active_base():
     return Product.query.filter(Product.deleted_at.is_(None))
 
 
-def _serialize_list(products, include_stock=True):
+def _serialize_list(products, include_stock=False):
+    # Buyers never see real stock counts — only admin endpoints pass include_stock=True.
     return [p.to_dict(include_stock=include_stock) for p in products]
 
 
@@ -82,23 +83,19 @@ def coming_soon():
 # GET /api/v1/products/sold-out
 @products_bp.get("/sold-out")
 def sold_out():
-    from models.stock_item import StockItem
-    from sqlalchemy import func, select
-    # subquery: product ids with at least one available stock item
-    has_stock = select(StockItem.product_id).where(StockItem.status == "available").distinct()
+    # Driven by the admin's manual is_available toggle, not a live stock_items count.
     q = _active_base().filter(
         Product.status == "active",
-        Product.id.not_in(has_stock)
+        Product.is_available.is_(False),
     ).order_by(Product.updated_at.desc())
-    return jsonify(_serialize_list(q.all(), include_stock=True)), 200
+    return jsonify(_serialize_list(q.all())), 200
 
 
 # GET /api/v1/products/<slug>
 @products_bp.get("/<slug>")
 def product_detail(slug):
     product = _active_base().filter_by(slug=slug).first_or_404()
-    data = product.to_dict(include_stock=True)
-    return jsonify(data), 200
+    return jsonify(product.to_dict()), 200
 
 
 # GET /api/v1/categories

@@ -26,5 +26,5 @@ class CartItem(db.Model):
             "unit_price": float(self.unit_price),
             "qty": self.qty,
             "created_at": self.created_at.isoformat(),
-            "product": self.product.to_dict(include_stock=True) if self.product else None
+            "product": self.product.to_dict() if self.product else None
         }

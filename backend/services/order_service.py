@@ -7,7 +7,6 @@ from models.cart import Cart
 from models.payment import Payment
 from models.product import Product
 from models.stock_item import StockItem
-from services.inventory_service import reserve_or_await_stock
 
 
 def generate_order_number():
@@ -18,7 +17,10 @@ def generate_order_number():
 
 def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_method="khqr"):
     """
-    Converts user's active cart into an Order, reserves stock, and creates a Payment record.
+    Converts user's active cart into an Order and creates a Payment record.
+    No stock_item is ever attached here — delivery is always a manual admin
+    action (see deliver_order) performed after payment, regardless of whether
+    stock happens to already exist for the product.
     Must be run inside a transaction.
     """
     cart = Cart.query.filter_by(id=cart_id, user_id=user_id, status="active").first()
@@ -49,46 +51,23 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
     db.session.add(order)
     db.session.flush()  # gets the order.id
 
-    # Process and reserve stock items
+    # One OrderItem per unit so the admin Deliver popup can resolve (pick or
+    # manually enter) exactly one credential per line, whatever the quantity bought.
     for item in cart.items:
-        if is_preorder:
-            # coming_soon products don't have active stock — no allocation attempted yet.
+        # coming_soon (preorder) lines stay a single row with the full qty — nothing
+        # to deliver until the product goes active and it's re-purchased normally.
+        per_unit_qty = item.qty if is_preorder else 1
+        count = 1 if is_preorder else item.qty
+        for _ in range(count):
             order_item = OrderItem(
                 order_id=order.id,
                 product_id=item.product_id,
                 title_snapshot=item.product.title,
                 unit_price=item.unit_price,
-                qty=item.qty,
+                qty=per_unit_qty,
                 stock_item_id=None
             )
             db.session.add(order_item)
-        else:
-            # Reserve whatever stock is actually available; any shortfall becomes an
-            # awaiting_stock line the admin sources after payment (on-demand flow).
-            reserved_items, missing_qty = reserve_or_await_stock(item.product_id, item.qty)
-
-            for r_item in reserved_items:
-                r_item.order_id = order.id  # Link stock item to order
-                order_item = OrderItem(
-                    order_id=order.id,
-                    product_id=item.product_id,
-                    title_snapshot=item.product.title,
-                    unit_price=item.unit_price,
-                    qty=1,  # Individual allocation per stock item
-                    stock_item_id=r_item.id
-                )
-                db.session.add(order_item)
-
-            for _ in range(missing_qty):
-                order_item = OrderItem(
-                    order_id=order.id,
-                    product_id=item.product_id,
-                    title_snapshot=item.product.title,
-                    unit_price=item.unit_price,
-                    qty=1,
-                    stock_item_id=None
-                )
-                db.session.add(order_item)
 
     # Create the Payment transaction record
     payment = Payment(
@@ -109,14 +88,15 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
 
 def mark_order_paid(order_id, provider_txn_id, raw_response=None):
     """
-    Marks an order as paid after payment confirmation.
-    Does NOT deliver credentials — admin must manually deliver via fulfill_order.
+    Marks an order as paid after payment confirmation — moves it into the
+    "Pending Delivery" state. Never auto-attaches stock: admin always delivers
+    manually via deliver_order, whether or not stock happens to already exist.
     """
     order = Order.query.get(order_id)
     if not order:
         raise ValueError("Order not found.")
 
-    if order.status in ("awaiting_stock", "paid", "fulfilled"):
+    if order.status in ("paid", "fulfilled"):
         return order
 
     payment = Payment.query.filter_by(order_id=order_id).first()
@@ -126,16 +106,8 @@ def mark_order_paid(order_id, provider_txn_id, raw_response=None):
         payment.raw_response = raw_response
         payment.updated_at = datetime.now(timezone.utc)
 
-    order.status = "awaiting_stock" if order.needs_sourcing else "paid"
+    order.status = "paid"  # "Pending Delivery" in the UI
     order.paid_at = datetime.now(timezone.utc)
-
-    # Payment succeeded — these stock items are now genuinely allocated to this order,
-    # not a temporary pre-payment hold. Clear the 15-min reservation timeout so the
-    # stale-reservation sweep can't reclaim them while the order sits waiting on
-    # admin delivery (which can legitimately take much longer than 15 minutes).
-    for item in order.items:
-        if item.stock_item and item.stock_item.reserved_until is not None:
-            item.stock_item.reserved_until = None
 
     db.session.commit()
 
@@ -159,7 +131,7 @@ def check_and_fulfill_bakong_order(order_id: int) -> bool:
     """
     For a pending_payment order paid via Bakong KHQR, poll the provider and,
     if paid, mark it paid. Does NOT fulfill/deliver — admin must manually
-    deliver via fulfill_order, same as every other payment method.
+    deliver via deliver_order, same as every other payment method.
     Used both by the checkout polling endpoint and the scheduler fallback sweep,
     so the "paid" transition isn't dependent on the buyer's browser tab staying open.
     Returns True if this call just marked the order paid.
@@ -186,9 +158,34 @@ def check_and_fulfill_bakong_order(order_id: int) -> bool:
     return True
 
 
-def fulfill_order(order_id, provider_txn_id=None, raw_response=None):
+def _validate_manual_payload(product_type: str, manual: dict) -> str:
+    """Builds the raw secret_payload string from admin-typed fields, matching
+    the same format rules as bulk stock upload (blueprints/admin/stock.py)."""
+    if product_type == "account":
+        username = (manual.get("username") or "").strip()
+        password = (manual.get("password") or "").strip()
+        if not username or not password:
+            raise ValueError("Both username and password are required for an account product.")
+        return f"{username}:{password}"
+    elif product_type == "game_key":
+        key = (manual.get("key") or "").strip()
+        if not key:
+            raise ValueError("A key is required for a game key product.")
+        if ":" in key:
+            raise ValueError("Game keys must not contain a colon ':' separator.")
+        return key
+    raise ValueError(f"Unknown product_type '{product_type}'.")
+
+
+def deliver_order(order_id, resolutions):
     """
-    Admin manually fulfills a paid order: marks stock as sold, sends credentials to buyer.
+    Admin manually delivers a paid (pending-delivery) order. For every line item
+    still missing a stock_item, `resolutions` must supply either an existing
+    available stock_item to claim, or manually-typed credentials to create one
+    on the spot. Both paths mark the stock item sold, assign it to the order line,
+    then flip the order to fulfilled and send credentials to the buyer.
+
+    resolutions: { order_item_id (int): {"stock_item_id": int} | {"manual": {...}} }
     """
     order = Order.query.get(order_id)
     if not order:
@@ -198,25 +195,42 @@ def fulfill_order(order_id, provider_txn_id=None, raw_response=None):
         return order
 
     if order.status not in ("paid", "pending_payment"):
-        raise ValueError(f"Cannot fulfill order with status '{order.status}'.")
+        raise ValueError(f"Cannot deliver order with status '{order.status}'.")
 
-    # If payment wasn't recorded yet (e.g. manual admin override), record it now
-    if provider_txn_id:
-        payment = Payment.query.filter_by(order_id=order_id).first()
-        if payment and not payment.provider_txn_id:
-            payment.status = "success"
-            payment.provider_txn_id = provider_txn_id
-            payment.raw_response = raw_response
-            payment.updated_at = datetime.now(timezone.utc)
+    unresolved = [item for item in order.items if item.stock_item_id is None]
+    for item in unresolved:
+        resolution = resolutions.get(item.id) or resolutions.get(str(item.id))
+        if not resolution:
+            raise ValueError(f"Missing delivery resolution for order item {item.id}.")
 
-    # Mark stock items as sold and increment product sales counts
-    for item in order.items:
-        if item.stock_item:
-            item.stock_item.status = "sold"
-            item.stock_item.reserved_until = None
-            product = Product.query.get(item.product_id)
-            if product:
-                product.sold_count += 1
+        if resolution.get("stock_item_id"):
+            stock_item = (
+                StockItem.query
+                .filter_by(id=resolution["stock_item_id"])
+                .with_for_update()
+                .first()
+            )
+            if not stock_item or stock_item.product_id != item.product_id:
+                raise ValueError(f"Stock item {resolution['stock_item_id']} does not belong to this product.")
+            if stock_item.status != "available":
+                raise ValueError(f"Stock item {stock_item.id} is no longer available.")
+        elif resolution.get("manual"):
+            from utils.security import encrypt_payload
+            product = item.product
+            payload = _validate_manual_payload(product.product_type, resolution["manual"])
+            stock_item = StockItem(product_id=item.product_id, secret_payload=encrypt_payload(payload))
+            db.session.add(stock_item)
+            db.session.flush()
+        else:
+            raise ValueError(f"Resolution for order item {item.id} must include stock_item_id or manual credentials.")
+
+        stock_item.status = "sold"
+        stock_item.order_id = order.id
+        item.stock_item_id = stock_item.id
+
+        product = item.product
+        if product:
+            product.sold_count += 1
 
     if not order.paid_at:
         order.paid_at = datetime.now(timezone.utc)

@@ -4,6 +4,7 @@ import client from '../../api/client'
 import { cancelOrder } from '../../api/endpoints'
 import { useCart } from '../../context/CartContext'
 import AccountLayout from './AccountLayout'
+import { formatOrderStatus } from '../../utils/orderStatus'
 
 const STEPS = [
   {
@@ -52,7 +53,6 @@ const STEPS = [
 function getProgress(status) {
   if (status === 'fulfilled')       return 100
   if (status === 'paid')            return 55   // between step 2 and 3
-  if (status === 'awaiting_stock')  return 35   // paid, but we still need to source the item
   if (status === 'pending_payment') return 12
   return null  // cancelled/failed — hide tracker
 }
@@ -61,7 +61,6 @@ function getProgress(status) {
 function getActiveStep(status) {
   if (status === 'fulfilled')       return 3
   if (status === 'paid')            return 2   // being prepared
-  if (status === 'awaiting_stock')  return 2   // being sourced, same visual step as "being prepared"
   if (status === 'pending_payment') return 0
   return -1
 }
@@ -79,13 +78,11 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
         <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
           status === 'fulfilled'       ? 'bg-emerald-500/15 text-emerald-400' :
           status === 'paid'            ? 'bg-violet-500/15 text-violet-400' :
-          status === 'awaiting_stock'  ? 'bg-orange-500/15 text-orange-400' :
           status === 'pending_payment' ? 'bg-amber-500/15 text-amber-400' :
                                          'bg-slate-700 text-slate-400'
         }`}>
           {status === 'fulfilled' ? 'Delivered' :
-           status === 'paid' ? 'Processing' :
-           status === 'awaiting_stock' ? 'Sourcing Item' :
+           status === 'paid' ? 'Pending Delivery' :
            status === 'pending_payment' ? 'Awaiting Payment' : status}
         </span>
       </div>
@@ -168,15 +165,6 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
           </p>
         </div>
       )}
-      {status === 'awaiting_stock' && (
-        <div className="mt-5 flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 px-4 py-2.5">
-          <div className="h-2 w-2 rounded-full bg-orange-400 animate-pulse flex-shrink-0" />
-          <p className="text-xs text-orange-300">
-            Payment confirmed! This item is sourced on demand — we're acquiring it now and
-            you'll be notified as soon as it's ready for delivery.
-          </p>
-        </div>
-      )}
       {status === 'fulfilled' && (
         <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5">
           <svg className="h-4 w-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -202,7 +190,6 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
 const STATUS_STYLE = {
   fulfilled: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   paid: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-  awaiting_stock: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   pending_payment: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
   failed: 'bg-red-500/10 text-red-400 border-red-500/20',
@@ -236,7 +223,7 @@ export default function OrderDetail() {
   }
 
   const handleCancel = async () => {
-    if (!confirm('Cancel this order and release the stock reservation?')) return
+    if (!confirm('Cancel this order?')) return
     setCancelling(true)
     try {
       await cancelOrder(order.id)
@@ -288,7 +275,7 @@ export default function OrderDetail() {
           <h2 className="text-2xl font-bold text-slate-100">Order #{order.order_number}</h2>
         </div>
         <span className={`rounded-xl border px-3 py-1 text-xs font-semibold uppercase ${statusStyle}`}>
-          {order.status.replace('_', ' ')}
+          {formatOrderStatus(order.status)}
         </span>
       </div>
 
@@ -321,6 +308,17 @@ export default function OrderDetail() {
                   Awaiting payment confirmation.
                 </div>
               ) : null}
+
+              {order.status === 'fulfilled' && item.product?.slug && (
+                <div className="mt-3 flex justify-end">
+                  <Link
+                    to={`/products/${item.product.slug}#write-review`}
+                    className="text-xs font-semibold text-violet-400 hover:text-violet-300 hover:underline transition flex items-center gap-1"
+                  >
+                    ★ Write a Review
+                  </Link>
+                </div>
+              )}
             </div>
           ))}
         </div>

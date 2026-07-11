@@ -133,7 +133,7 @@ export default function AdminStock() {
     }
   }
 
-  const statusColor = { available: 'text-emerald-400', reserved: 'text-amber-400', sold: 'text-slate-500' }
+  const statusColor = { available: 'text-emerald-400', sold: 'text-slate-500' }
 
   return (
     <AdminLayout>
@@ -147,7 +147,7 @@ export default function AdminStock() {
         </span>
         {awaitingCount > 0 && (
           <span className="rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-xs font-semibold text-orange-400">
-            ⏳ {awaitingCount} order{awaitingCount > 1 ? 's' : ''} waiting on this stock
+            ⏳ {awaitingCount} order{awaitingCount > 1 ? 's' : ''} pending delivery for this product
           </span>
         )}
       </div>

@@ -57,44 +57,45 @@ export default function Search() {
       </div>
 
       <div className="flex flex-col gap-6 lg:flex-row">
-        {/* Filters sidebar */}
-        <aside className="w-full lg:w-56 flex-shrink-0 space-y-5">
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Category</p>
-            <div className="space-y-1">
-              <button onClick={() => set('category', '')}
-                className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${!category ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                All
-              </button>
-              {categories.map((c) => (
-                <button key={c.id} onClick={() => set('category', c.slug)}
-                  className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${category === c.slug ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                  {c.name}
+        <aside className="w-full lg:w-56 flex-shrink-0">
+          <div className="space-y-5 lg:sticky lg:top-20">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Category</p>
+              <div className="space-y-1">
+                <button onClick={() => set('category', '')}
+                  className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${!category ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                  All
+                </button>
+                {categories.map((c) => (
+                  <button key={c.id} onClick={() => set('category', c.slug)}
+                    className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${category === c.slug ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Type</p>
+              {[['', 'All'], ['account', 'Game Account'], ['game_key', 'Game Key']].map(([val, label]) => (
+                <button key={val} onClick={() => set('type', val)}
+                  className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${type === val ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                  {label}
                 </button>
               ))}
             </div>
-          </div>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Type</p>
-            {[['', 'All'], ['account', 'Game Account'], ['game_key', 'Game Key']].map(([val, label]) => (
-              <button key={val} onClick={() => set('type', val)}
-                className={`block w-full rounded-lg px-3 py-1.5 text-left text-sm transition ${type === val ? 'bg-violet-600/20 text-violet-400' : 'text-slate-400 hover:text-slate-200'}`}>
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div>
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Price (USD)</p>
-            <div className="flex items-center gap-2">
-              <input type="number" min="0" placeholder="Min" value={minPrice}
-                onChange={(e) => set('min', e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
-              <span className="text-slate-600">–</span>
-              <input type="number" min="0" placeholder="Max" value={maxPrice}
-                onChange={(e) => set('max', e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">Price (USD)</p>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" placeholder="Min" value={minPrice}
+                  onChange={(e) => set('min', e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
+                <span className="text-slate-600">–</span>
+                <input type="number" min="0" placeholder="Max" value={maxPrice}
+                  onChange={(e) => set('max', e.target.value)}
+                  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-violet-500" />
+              </div>
             </div>
           </div>
         </aside>

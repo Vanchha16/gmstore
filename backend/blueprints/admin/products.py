@@ -81,6 +81,7 @@ def create_product():
         compare_at_price=float(data["compare_at_price"]) if data.get("compare_at_price") else None,
         currency=data.get("currency", "USD"),
         status=data.get("status", "draft"),
+        is_available=bool(data.get("is_available", True)),
         release_date=release_date,
         is_featured=bool(data.get("is_featured", False)),
         delivery_time=data.get("delivery_time") or None,
@@ -122,15 +123,11 @@ def update_product(product_id):
         product.compare_at_price = float(data["compare_at_price"]) if data["compare_at_price"] else None
     if "currency" in data:
         product.currency = data["currency"]
+    if "is_available" in data:
+        product.is_available = bool(data["is_available"])
     if "status" in data:
         new_status = data["status"]
         old_status = product.status
-        # Block setting active if no available stock
-        if new_status == "active" and product.available_stock == 0 and data.get("force") != True:
-            return jsonify({
-                "error": "Cannot set product to active with 0 available stock. Add stock first, or pass force=true to override.",
-                "available_stock": 0
-            }), 400
         product.status = new_status
         # Notify waiting pre-orderers when a coming_soon product goes active
         if old_status == "coming_soon" and new_status == "active":

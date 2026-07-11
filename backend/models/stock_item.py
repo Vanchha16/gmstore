@@ -14,9 +14,8 @@ class StockItem(db.Model):
     id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
     product_id = db.Column(db.BigInteger, db.ForeignKey("products.id"), nullable=False)
     secret_payload = db.Column(db.Text, nullable=False)  # Fernet-encrypted at rest
-    status = db.Column(db.Enum("available", "reserved", "sold"), nullable=False, default="available")
+    status = db.Column(db.Enum("available", "sold"), nullable=False, default="available")
     order_id = db.Column(db.BigInteger, db.ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
-    reserved_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
 
     product = db.relationship("Product", back_populates="stock_items")

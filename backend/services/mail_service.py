@@ -214,25 +214,3 @@ def send_delivery_email(order):
     except Exception as exc:
         current_app.logger.warning("Mail send failed: %s", exc)
 
-
-def send_stock_ready_notification(order):
-    """Order was awaiting_stock and just got fully restocked — let the buyer know it's queued for delivery."""
-    mail_username = current_app.config.get("MAIL_USERNAME")
-    if not mail_username or mail_username == "your@gmail.com":
-        print(f"[DEV MAIL] Stock-ready email skipped for Order {order.order_number} because MAIL_USERNAME is unconfigured.", flush=True)
-        return
-
-    subject = f"Your GM Store Order {order.order_number} is sourced and ready!"
-    body = (
-        f"Hi {order.user.full_name},\n\n"
-        f"Good news — the item(s) you ordered have been sourced and are ready.\n\n"
-        f"Your order is now queued for delivery; you'll get your credentials as soon as "
-        f"our admin confirms it (usually within a few hours).\n\n"
-        f"— GM Store"
-    )
-    msg = Message(subject=subject, recipients=[order.user.email], body=body)
-    try:
-        mail.send(msg)
-    except Exception as exc:
-        current_app.logger.warning("Mail send failed: %s", exc)
-

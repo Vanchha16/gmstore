@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import client from '../../api/client'
 import AccountLayout from './AccountLayout'
+import { formatOrderStatus } from '../../utils/orderStatus'
 
 export default function PurchaseHistory() {
   const [orders, setOrders] = useState([])
@@ -31,8 +32,6 @@ export default function PurchaseHistory() {
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
       case 'pending_payment':
         return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
-      case 'awaiting_stock':
-        return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
       case 'cancelled':
       case 'failed':
         return 'bg-red-500/10 text-red-400 border-red-500/20'
@@ -77,7 +76,7 @@ export default function PurchaseHistory() {
                       Order #{order.order_number}
                     </Link>
                     <span className={`rounded-xl border px-2 py-0.5 text-[10px] font-semibold uppercase ${getStatusStyle(order.status)}`}>
-                      {(order.status || '').replace('_', ' ')}
+                      {formatOrderStatus(order.status)}
                     </span>
                   </div>
                   <span className="text-xs text-slate-500 mt-1 block">

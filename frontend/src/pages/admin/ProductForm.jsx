@@ -19,7 +19,7 @@ export default function ProductForm() {
   const [form, setForm] = useState({
     title: '', description: '', product_type: 'game_key', category_id: '',
     price: '', compare_at_price: '', currency: 'USD', status: 'draft',
-    release_date: '', is_featured: false, delivery_time: '', rules: '',
+    release_date: '', is_featured: false, is_available: true, delivery_time: '', rules: '',
   })
   const [categories, setCategories] = useState([])
   const [images, setImages] = useState([])
@@ -43,6 +43,7 @@ export default function ProductForm() {
           status: data.status || 'draft',
           release_date: data.release_date ? data.release_date.slice(0, 16) : '',
           is_featured: data.is_featured || false,
+          is_available: data.is_available ?? true,
           delivery_time: data.delivery_time || '',
           rules: data.rules || '',
         })
@@ -165,6 +166,14 @@ export default function ProductForm() {
             <input type="checkbox" checked={form.is_featured} onChange={set('is_featured')}
               className="rounded border-slate-600 bg-slate-800 text-violet-500" />
             <span className="text-sm text-slate-400">Mark as featured (Best Sale)</span>
+          </label>
+
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.is_available} onChange={set('is_available')}
+              className="rounded border-slate-600 bg-slate-800 text-violet-500" />
+            <span className="text-sm text-slate-400">
+              Available for purchase — manual flag shown to buyers, independent of stock on hand
+            </span>
           </label>
 
           <Input

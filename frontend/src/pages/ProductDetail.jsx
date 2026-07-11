@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
-import { getProduct, addFavorite, removeFavorite, getUserFavorites, addPreorder } from '../api/endpoints'
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom'
+import { getProduct, addFavorite, removeFavorite, getUserFavorites, addPreorder, getProductReviews, addProductReview } from '../api/endpoints'
 import StatusBadge from '../components/product/StatusBadge'
 import TypeBadge from '../components/product/TypeBadge'
 import PriceTag from '../components/product/PriceTag'
@@ -27,11 +27,32 @@ function RulesSection({ rules }) {
   )
 }
 
+function RatingInput({ value, onChange }) {
+  const [hover, setHover] = useState(0)
+  return (
+    <div className="flex gap-1 text-2xl">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          type="button"
+          key={star}
+          onClick={() => onChange(star)}
+          onMouseEnter={() => setHover(star)}
+          onMouseLeave={() => setHover(0)}
+          className={`transition-colors cursor-pointer ${(hover || value) >= star ? 'text-amber-400' : 'text-slate-700'}`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function ProductDetail() {
   const { slug } = useParams()
   const { user } = useAuth()
   const { addToCart } = useCart()
   const navigate = useNavigate()
+  const location = useLocation()
   const toast = useToast()
 
   const [product, setProduct] = useState(null)
@@ -43,14 +64,63 @@ export default function ProductDetail() {
   const [favLoading, setFavLoading] = useState(false)
   const [adding, setAdding] = useState(false)
   const [preordering, setPreordering] = useState(false)
+  
+  // Reviews state
+  const [reviews, setReviews] = useState([])
+  const [loadingReviews, setLoadingReviews] = useState(false)
+  const [ratingInput, setRatingInput] = useState(5)
+  const [commentInput, setCommentInput] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [reviewError, setReviewError] = useState('')
+  const [reviewSuccess, setReviewSuccess] = useState(false)
   const [msg] = useState(null)
+
+  const loadReviews = (prodId) => {
+    setLoadingReviews(true)
+    getProductReviews(prodId)
+      .then(({ data }) => setReviews(data.items || []))
+      .catch(console.error)
+      .finally(() => setLoadingReviews(false))
+  }
 
   useEffect(() => {
     getProduct(slug)
-      .then(({ data }) => { setProduct(data); setActiveImg(0) })
+      .then(({ data }) => {
+        setProduct(data)
+        setActiveImg(0)
+        loadReviews(data.id)
+      })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false))
   }, [slug])
+
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault()
+    setReviewError('')
+    setSubmitting(true)
+    try {
+      await addProductReview(product.id, { rating: ratingInput, comment: commentInput })
+      setReviewSuccess(true)
+      toast('Review submitted successfully!', 'success')
+      loadReviews(product.id)
+      getProduct(slug)
+        .then(({ data }) => setProduct(data))
+        .catch(console.error)
+    } catch (err) {
+      setReviewError(err.response?.data?.error || err.message || 'Failed to submit review.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  useEffect(() => {
+    if (product && location.hash === '#write-review') {
+      setTimeout(() => {
+        const el = document.getElementById('write-review')
+        if (el) el.scrollIntoView({ behavior: 'smooth' })
+      }, 300)
+    }
+  }, [product, location.hash])
 
   // Check if product is favorited on load
   useEffect(() => {
@@ -186,10 +256,10 @@ export default function ProductDetail() {
           <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-400">
             {product.status === 'coming_soon' ? (
               <p>This product is coming soon.{product.release_date && ` Expected: ${new Date(product.release_date).toLocaleDateString()}`}</p>
-            ) : product.available_stock === 0 ? (
-              <p className="text-amber-400">⏳ Sourced on demand — we buy this after you order, delivery may take longer than usual.</p>
+            ) : product.is_available ? (
+              <p className="text-emerald-400">✓ Available</p>
             ) : (
-              <p className="text-emerald-400">✓ {product.available_stock} available</p>
+              <p className="text-red-400">Not Available</p>
             )}
           </div>
 
@@ -213,9 +283,9 @@ export default function ProductDetail() {
           {product.rules && <RulesSection rules={product.rules} />}
 
           <div className="flex gap-3">
-            {product.status === 'active' && (
+            {product.status === 'active' && product.is_available && (
               <>
-                {/* Quantity stepper — capped at available stock, or MAX_ON_DEMAND_QTY when sourcing on demand */}
+                {/* Quantity stepper — capped at MAX_ON_DEMAND_QTY; purchase never depends on real stock counts */}
                 <div className="flex items-center rounded-xl border border-slate-700 bg-slate-900">
                   <button
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -224,8 +294,8 @@ export default function ProductDetail() {
                   >−</button>
                   <span className="w-8 text-center font-mono text-sm font-semibold text-slate-100">{qty}</span>
                   <button
-                    onClick={() => setQty((q) => Math.min(Math.max(product.available_stock, MAX_ON_DEMAND_QTY), q + 1))}
-                    disabled={qty >= Math.max(product.available_stock, MAX_ON_DEMAND_QTY)}
+                    onClick={() => setQty((q) => Math.min(MAX_ON_DEMAND_QTY, q + 1))}
+                    disabled={qty >= MAX_ON_DEMAND_QTY}
                     className="w-10 text-lg text-slate-400 hover:text-slate-100 disabled:opacity-30 transition"
                   >+</button>
                 </div>
@@ -237,6 +307,14 @@ export default function ProductDetail() {
                   {adding ? 'Adding…' : 'Add to Cart'}
                 </button>
               </>
+            )}
+            {product.status === 'active' && !product.is_available && (
+              <button
+                disabled={true}
+                className="flex-1 rounded-xl border border-slate-700 py-3 font-semibold text-slate-500 bg-slate-900/10 cursor-not-allowed transition"
+              >
+                Not Available
+              </button>
             )}
             {product.status === 'coming_soon' && (
               <button
@@ -267,6 +345,126 @@ export default function ProductDetail() {
                 </svg>
               )}
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Reviews Section */}
+      <div className="mt-16 border-t border-slate-800 pt-10">
+        <div className="grid gap-10 lg:grid-cols-3">
+          {/* Review Form & Summary */}
+          <div className="lg:col-span-1 space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-slate-100">Customer Reviews</h2>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-3xl font-extrabold text-slate-100">
+                  {product.rating_avg ? parseFloat(product.rating_avg).toFixed(2) : '0.00'}
+                </span>
+                <div>
+                  <div className="flex text-amber-400 text-sm">
+                    {Array.from({ length: 5 }).map((_, idx) => {
+                      const starRating = Math.round(product.rating_avg || 0)
+                      return (
+                        <span key={idx} className="transition-colors">
+                          {idx < starRating ? '★' : '☆'}
+                        </span>
+                      )
+                    })}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Based on {product.rating_count} review{product.rating_count !== 1 ? 's' : ''}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Form container */}
+            <div id="write-review" className="rounded-2xl border border-slate-800 bg-slate-900/30 p-5 backdrop-blur-sm">
+              <h3 className="text-sm font-bold text-slate-200 mb-4">Write a Review</h3>
+              {reviewSuccess ? (
+                <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-400">
+                  Thank you for your feedback! Your review has been submitted successfully.
+                </div>
+              ) : !user ? (
+                <p className="text-xs text-slate-500">
+                  Please <Link to="/login" className="text-violet-400 hover:underline">sign in</Link> to share your experience with this product.
+                </p>
+              ) : reviews.some((r) => r.user_id === user.id) ? (
+                <p className="text-xs text-slate-500">
+                  You have already submitted a review for this product. Thank you!
+                </p>
+              ) : (
+                <form onSubmit={handleReviewSubmit} className="space-y-4">
+                  {reviewError && (
+                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+                      {reviewError}
+                    </div>
+                  )}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Rating</label>
+                    <RatingInput value={ratingInput} onChange={setRatingInput} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 mb-1.5">Your Review</label>
+                    <textarea
+                      required
+                      rows={4}
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder="Tell us what you think of this product..."
+                      className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-xs text-slate-200 placeholder-slate-650 outline-none focus:border-violet-500 resize-none"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full rounded-xl bg-violet-600 py-2.5 text-xs font-semibold text-white hover:bg-violet-500 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {submitting ? 'Submitting…' : 'Submit Review'}
+                  </button>
+                </form>
+              )}
+            </div>
+          </div>
+
+          {/* Reviews List */}
+          <div className="lg:col-span-2 space-y-4">
+            <h3 className="font-semibold text-slate-200">Reviews History</h3>
+            {loadingReviews ? (
+              <div className="flex py-8 justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-violet-500 border-t-transparent" />
+              </div>
+            ) : reviews.length === 0 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">There are no reviews for this product yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {reviews.map((r) => (
+                  <div key={r.id} className="rounded-2xl border border-slate-800 bg-slate-900/20 p-5">
+                    <div className="flex justify-between items-start flex-wrap gap-2 mb-2">
+                      <div>
+                        <p className="text-xs font-bold text-slate-200">{r.user_name}</p>
+                        <div className="flex text-amber-400 text-xs mt-1">
+                          {Array.from({ length: 5 }).map((_, idx) => (
+                            <span key={idx}>
+                              {idx < r.rating ? '★' : '☆'}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {r.is_verified_purchase && (
+                          <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-semibold text-emerald-400">
+                            ✓ Verified Purchase
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-605">
+                          {new Date(r.created_at + 'Z').toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-wrap">{r.comment}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
