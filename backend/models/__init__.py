@@ -17,5 +17,7 @@ from .chat_message import ChatMessage
 from .wallet import Wallet
 from .wallet_transaction import WalletTransaction
 from .wallet_topup import WalletTopup
+from .promo_code import PromoCode
+from .promo_code_redemption import PromoCodeRedemption
 
 

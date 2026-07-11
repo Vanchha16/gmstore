@@ -1,5 +1,6 @@
 from extensions import db
 from models.order import Order
+from services import promo_service
 
 
 def _refund_wallet_hold(order: "Order") -> None:
@@ -16,7 +17,8 @@ def _refund_wallet_hold(order: "Order") -> None:
 
 def cancel_order(order_id: int) -> "Order":
     """
-    Cancel a pending_payment order and refund any wallet amount already debited.
+    Cancel a pending_payment order, refund any wallet amount already debited,
+    and free up its promo code redemption (if any) so the code can be reused.
     """
     order = Order.query.get(order_id)
     if not order:
@@ -26,6 +28,7 @@ def cancel_order(order_id: int) -> "Order":
             f"Cannot cancel — order status is '{order.status}'."
         )
     _refund_wallet_hold(order)
+    promo_service.void_redemption_for_order(order)
     order.status = "cancelled"
     db.session.commit()
     return order

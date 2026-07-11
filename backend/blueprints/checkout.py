@@ -9,6 +9,7 @@ from services.order_service import create_order_from_cart, mark_order_paid, chec
 from services.payway_service import get_payment_details
 from services.inventory_service import _refund_wallet_hold
 from services.wallet_service import get_or_create_wallet, debit_wallet
+from services import promo_service
 
 checkout_bp = Blueprint("checkout", __name__, url_prefix="/api/v1")
 
@@ -33,6 +34,7 @@ def checkout():
     stale = Order.query.filter_by(user_id=user_id, status="pending_payment").all()
     for old in stale:
         _refund_wallet_hold(old)
+        promo_service.void_redemption_for_order(old)
         old.status = "cancelled"
     if stale:
         db.session.commit()
@@ -48,6 +50,7 @@ def checkout():
                 debit_wallet(user_id, order.total, type="purchase",
                               order_id=order.id, reference=order.order_number)
             except ValueError as e:
+                promo_service.void_redemption_for_order(order)
                 order.status = "cancelled"
                 db.session.commit()
                 return jsonify({"error": str(e)}), 400
@@ -151,6 +154,7 @@ def cancel_order_route(order_id):
 
     try:
         _refund_wallet_hold(order)
+        promo_service.void_redemption_for_order(order)
         order.status = "cancelled"
 
         # Restore cart so user can try again immediately

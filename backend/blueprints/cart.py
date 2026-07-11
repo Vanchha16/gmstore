@@ -4,6 +4,7 @@ from extensions import db
 from models.cart import Cart
 from models.cart_item import CartItem
 from models.product import Product
+from services import promo_service
 
 cart_bp = Blueprint("cart", __name__, url_prefix="/api/v1/cart")
 
@@ -22,12 +23,18 @@ def get_or_create_active_cart(user_id):
     return cart
 
 
+def _cart_response(cart, user_id):
+    data = cart.to_dict()
+    data["totals"] = promo_service.preview_cart_totals(cart, user_id)
+    return data
+
+
 @cart_bp.get("")
 @jwt_required()
 def get_cart():
     user_id = int(get_jwt_identity())
     cart = get_or_create_active_cart(user_id)
-    return jsonify(cart.to_dict()), 200
+    return jsonify(_cart_response(cart, user_id)), 200
 
 
 @cart_bp.post("/items")
@@ -71,7 +78,7 @@ def add_cart_item():
         db.session.add(item)
 
     db.session.commit()
-    return jsonify(cart.to_dict()), 200
+    return jsonify(_cart_response(cart, user_id)), 200
 
 
 @cart_bp.patch("/items/<int:item_id>")
@@ -96,7 +103,7 @@ def update_cart_item(item_id):
 
     item.qty = qty
     db.session.commit()
-    return jsonify(cart.to_dict()), 200
+    return jsonify(_cart_response(cart, user_id)), 200
 
 
 @cart_bp.delete("/items/<int:item_id>")
@@ -108,4 +115,45 @@ def delete_cart_item(item_id):
 
     db.session.delete(item)
     db.session.commit()
-    return jsonify(cart.to_dict()), 200
+    return jsonify(_cart_response(cart, user_id)), 200
+
+
+# POST /api/v1/cart/apply-promo  — validates and stores the code on the cart for preview only.
+# Not persisted to an order until checkout re-validates it inside the order transaction.
+@cart_bp.post("/apply-promo")
+@jwt_required()
+def apply_promo():
+    user_id = int(get_jwt_identity())
+    data = request.get_json(silent=True) or {}
+    code = (data.get("code") or "").strip()
+    if not code:
+        return jsonify({"error": "code is required."}), 400
+
+    cart = get_or_create_active_cart(user_id)
+    if not cart.items:
+        return jsonify({"error": "Your cart is empty."}), 400
+
+    promo = promo_service.find_active_code(code)
+    if not promo:
+        return jsonify({"error": "This promo code is not valid."}), 404
+
+    subtotal = promo_service.cart_subtotal(cart)
+    try:
+        promo_service.validate_promo_code(promo, user_id, subtotal)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    cart.promo_code_id = promo.id
+    db.session.commit()
+    return jsonify(_cart_response(cart, user_id)), 200
+
+
+# DELETE /api/v1/cart/apply-promo  — removes whatever code is currently applied.
+@cart_bp.delete("/apply-promo")
+@jwt_required()
+def remove_promo():
+    user_id = int(get_jwt_identity())
+    cart = get_or_create_active_cart(user_id)
+    cart.promo_code_id = None
+    db.session.commit()
+    return jsonify(_cart_response(cart, user_id)), 200

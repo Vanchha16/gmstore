@@ -23,6 +23,8 @@ class Order(db.Model):
     is_preorder = db.Column(db.Boolean, nullable=False, default=False)
     # Amount of this order's total already debited from the buyer's wallet (0 if none).
     wallet_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    # The promo code applied at checkout, if any — `discount` above holds the resulting amount.
+    promo_code_id = db.Column(db.BigInteger, db.ForeignKey("promo_codes.id", ondelete="SET NULL"), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     paid_at = db.Column(db.DateTime, nullable=True)
     fulfilled_at = db.Column(db.DateTime, nullable=True)
@@ -31,6 +33,7 @@ class Order(db.Model):
     user = db.relationship("User", backref=db.backref("orders_list", lazy="dynamic", cascade="all, delete-orphan"))
     items = db.relationship("OrderItem", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
     payments = db.relationship("Payment", back_populates="order", cascade="all, delete-orphan", lazy="selectin")
+    promo_code = db.relationship("PromoCode")
 
     def to_dict(self):
         return {
@@ -44,6 +47,7 @@ class Order(db.Model):
             "currency": self.currency,
             "is_preorder": self.is_preorder,
             "wallet_amount": float(self.wallet_amount),
+            "promo_code": self.promo_code.summary_dict() if self.promo_code else None,
             "delivery_confirmed": self.delivery_confirmed,
             "created_at": self.created_at.isoformat(),
             "paid_at": self.paid_at.isoformat() if self.paid_at else None,

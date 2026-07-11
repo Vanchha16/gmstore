@@ -87,6 +87,11 @@ export default function PurchaseHistory() {
                   <div>
                     <span className="text-xs text-slate-500 block">Total Price</span>
                     <span className="font-mono text-sm font-bold text-violet-400">${parseFloat(order.total || 0).toFixed(2)}</span>
+                    {order.discount > 0 && (
+                      <span className="mt-0.5 block text-[10px] font-semibold text-emerald-400">
+                        {order.promo_code ? order.promo_code.code : 'Promo'} · -${parseFloat(order.discount).toFixed(2)}
+                      </span>
+                    )}
                   </div>
                   <Link
                     to={`/account/history/${order.id}`}
