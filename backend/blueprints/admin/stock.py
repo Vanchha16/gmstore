@@ -8,6 +8,26 @@ from utils.security import encrypt_payload
 admin_stock_bp = Blueprint("admin_stock", __name__, url_prefix="/api/v1/admin/products")
 
 
+# GET /api/v1/admin/products/<int:product_id>/awaiting-count
+@admin_stock_bp.get("/<int:product_id>/awaiting-count")
+@role_required("admin")
+def get_awaiting_count(product_id):
+    """Number of unlinked order lines (across awaiting_stock orders) still needing this product sourced."""
+    from models.order import Order
+    from models.order_item import OrderItem
+    count = (
+        OrderItem.query
+        .join(Order, OrderItem.order_id == Order.id)
+        .filter(
+            OrderItem.product_id == product_id,
+            OrderItem.stock_item_id.is_(None),
+            Order.status == "awaiting_stock",
+        )
+        .count()
+    )
+    return jsonify({"count": count}), 200
+
+
 # POST /api/v1/admin/products/<int:product_id>/stock  — bulk add
 @admin_stock_bp.post("/<int:product_id>/stock")
 @role_required("admin")
@@ -39,7 +59,16 @@ def add_stock(product_id):
         items.append(item)
 
     db.session.commit()
-    return jsonify({"added": len(items), "message": f"Successfully added {len(items)} stock items."}), 201
+
+    resolved = 0
+    if items:
+        from services.inventory_service import try_fulfill_awaiting_orders
+        resolved = try_fulfill_awaiting_orders(product_id)
+
+    message = f"Successfully added {len(items)} stock items."
+    if resolved:
+        message += f" Auto-fulfilled {resolved} order(s) that were awaiting stock."
+    return jsonify({"added": len(items), "orders_resolved": resolved, "message": message}), 201
 
 
 # GET /api/v1/admin/products/<int:product_id>/stock

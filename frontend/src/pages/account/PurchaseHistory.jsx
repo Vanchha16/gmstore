@@ -31,6 +31,8 @@ export default function PurchaseHistory() {
         return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
       case 'pending_payment':
         return 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+      case 'awaiting_stock':
+        return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
       case 'cancelled':
       case 'failed':
         return 'bg-red-500/10 text-red-400 border-red-500/20'

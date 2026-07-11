@@ -7,6 +7,11 @@ from models.product import Product
 
 cart_bp = Blueprint("cart", __name__, url_prefix="/api/v1/cart")
 
+# Active products can be bought even at 0 stock (admin sources it after payment —
+# see reserve_or_await_stock / awaiting_stock flow). Still cap qty per line so a
+# single order can't queue up an unbounded sourcing commitment for the admin.
+MAX_ON_DEMAND_QTY = 10
+
 
 def get_or_create_active_cart(user_id):
     cart = Cart.query.filter_by(user_id=user_id, status="active").first()
@@ -48,11 +53,14 @@ def add_cart_item():
     if item:
         target_qty += item.qty
 
-    # Stock validation for active products
+    # Active products can be bought past available stock — admin sources the shortfall
+    # after payment. Only the on-demand *overflow* is capped, not normal in-stock buys.
     if product.status == "active":
         available = product.available_stock
-        if available < target_qty:
-            return jsonify({"error": f"Insufficient stock. Only {available} items available."}), 400
+        if target_qty > available and target_qty > MAX_ON_DEMAND_QTY:
+            return jsonify({
+                "error": f"Only {available} in stock. Max {MAX_ON_DEMAND_QTY} allowed when sourcing on demand."
+            }), 400
 
     if item:
         item.qty = target_qty
@@ -86,8 +94,10 @@ def update_cart_item(item_id):
     product = Product.query.get(item.product_id)
     if product and product.status == "active":
         available = product.available_stock
-        if available < qty:
-            return jsonify({"error": f"Insufficient stock. Only {available} items available."}), 400
+        if qty > available and qty > MAX_ON_DEMAND_QTY:
+            return jsonify({
+                "error": f"Only {available} in stock. Max {MAX_ON_DEMAND_QTY} allowed when sourcing on demand."
+            }), 400
 
     item.qty = qty
     db.session.commit()

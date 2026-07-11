@@ -29,6 +29,7 @@ export const adminDeleteCategory = (id) => client.delete(`/admin/products/catego
 // Admin stock
 export const adminAddStock = (productId, payloads) => client.post(`/admin/products/${productId}/stock`, { payloads })
 export const adminListStock = (productId, params) => client.get(`/admin/products/${productId}/stock`, { params })
+export const adminGetAwaitingCount = (productId) => client.get(`/admin/products/${productId}/awaiting-count`)
 export const adminDeleteStock = (itemId) => client.delete(`/admin/products/stock/${itemId}`)
 export const adminUpdateStock = (itemId, data) => client.patch(`/admin/products/stock/${itemId}`, data)
 

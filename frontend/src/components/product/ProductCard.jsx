@@ -49,7 +49,9 @@ export default function ProductCard({ product }) {
 
         {/* Stock counts */}
         {typeof product.available_stock === 'number' && product.status === 'active' && (
-          <p className="text-xs text-slate-500 font-medium pt-1">{product.available_stock} in stock</p>
+          <p className="text-xs text-slate-500 font-medium pt-1">
+            {product.available_stock > 0 ? `${product.available_stock} in stock` : 'Sourced after order — delivery may take longer'}
+          </p>
         )}
       </div>
     </Link>

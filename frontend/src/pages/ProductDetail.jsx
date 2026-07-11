@@ -9,6 +9,8 @@ import { useAuth } from '../context/AuthContext'
 import { useCart } from '../context/CartContext'
 import { useToast } from '../context/ToastContext'
 
+const MAX_ON_DEMAND_QTY = 10 // keep in sync with backend blueprints/cart.py
+
 function RulesSection({ rules }) {
   return (
     <div className="rounded-xl border border-slate-800 overflow-hidden bg-slate-900/10">
@@ -185,7 +187,7 @@ export default function ProductDetail() {
             {product.status === 'coming_soon' ? (
               <p>This product is coming soon.{product.release_date && ` Expected: ${new Date(product.release_date).toLocaleDateString()}`}</p>
             ) : product.available_stock === 0 ? (
-              <p className="text-red-400">Out of stock</p>
+              <p className="text-amber-400">⏳ Sourced on demand — we buy this after you order, delivery may take longer than usual.</p>
             ) : (
               <p className="text-emerald-400">✓ {product.available_stock} available</p>
             )}
@@ -211,9 +213,9 @@ export default function ProductDetail() {
           {product.rules && <RulesSection rules={product.rules} />}
 
           <div className="flex gap-3">
-            {product.status === 'active' && product.available_stock > 0 && (
+            {product.status === 'active' && (
               <>
-                {/* Quantity stepper */}
+                {/* Quantity stepper — capped at available stock, or MAX_ON_DEMAND_QTY when sourcing on demand */}
                 <div className="flex items-center rounded-xl border border-slate-700 bg-slate-900">
                   <button
                     onClick={() => setQty((q) => Math.max(1, q - 1))}
@@ -222,8 +224,8 @@ export default function ProductDetail() {
                   >−</button>
                   <span className="w-8 text-center font-mono text-sm font-semibold text-slate-100">{qty}</span>
                   <button
-                    onClick={() => setQty((q) => Math.min(product.available_stock, q + 1))}
-                    disabled={qty >= product.available_stock}
+                    onClick={() => setQty((q) => Math.min(Math.max(product.available_stock, MAX_ON_DEMAND_QTY), q + 1))}
+                    disabled={qty >= Math.max(product.available_stock, MAX_ON_DEMAND_QTY)}
                     className="w-10 text-lg text-slate-400 hover:text-slate-100 disabled:opacity-30 transition"
                   >+</button>
                 </div>

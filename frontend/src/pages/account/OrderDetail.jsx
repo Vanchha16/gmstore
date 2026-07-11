@@ -52,6 +52,7 @@ const STEPS = [
 function getProgress(status) {
   if (status === 'fulfilled')       return 100
   if (status === 'paid')            return 55   // between step 2 and 3
+  if (status === 'awaiting_stock')  return 35   // paid, but we still need to source the item
   if (status === 'pending_payment') return 12
   return null  // cancelled/failed — hide tracker
 }
@@ -60,6 +61,7 @@ function getProgress(status) {
 function getActiveStep(status) {
   if (status === 'fulfilled')       return 3
   if (status === 'paid')            return 2   // being prepared
+  if (status === 'awaiting_stock')  return 2   // being sourced, same visual step as "being prepared"
   if (status === 'pending_payment') return 0
   return -1
 }
@@ -77,11 +79,13 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
         <span className={`rounded-full px-3 py-0.5 text-xs font-semibold ${
           status === 'fulfilled'       ? 'bg-emerald-500/15 text-emerald-400' :
           status === 'paid'            ? 'bg-violet-500/15 text-violet-400' :
+          status === 'awaiting_stock'  ? 'bg-orange-500/15 text-orange-400' :
           status === 'pending_payment' ? 'bg-amber-500/15 text-amber-400' :
                                          'bg-slate-700 text-slate-400'
         }`}>
           {status === 'fulfilled' ? 'Delivered' :
            status === 'paid' ? 'Processing' :
+           status === 'awaiting_stock' ? 'Sourcing Item' :
            status === 'pending_payment' ? 'Awaiting Payment' : status}
         </span>
       </div>
@@ -164,6 +168,15 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
           </p>
         </div>
       )}
+      {status === 'awaiting_stock' && (
+        <div className="mt-5 flex items-center gap-2 rounded-xl border border-orange-500/20 bg-orange-500/5 px-4 py-2.5">
+          <div className="h-2 w-2 rounded-full bg-orange-400 animate-pulse flex-shrink-0" />
+          <p className="text-xs text-orange-300">
+            Payment confirmed! This item is sourced on demand — we're acquiring it now and
+            you'll be notified as soon as it's ready for delivery.
+          </p>
+        </div>
+      )}
       {status === 'fulfilled' && (
         <div className="mt-5 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-2.5">
           <svg className="h-4 w-4 text-emerald-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -189,6 +202,7 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
 const STATUS_STYLE = {
   fulfilled: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   paid: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+  awaiting_stock: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   pending_payment: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
   cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
   failed: 'bg-red-500/10 text-red-400 border-red-500/20',

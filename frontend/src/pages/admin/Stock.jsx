@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { adminListStock, adminAddStock, adminDeleteStock, adminGetProduct, adminUpdateStock } from '../../api/endpoints'
+import { adminListStock, adminAddStock, adminDeleteStock, adminGetProduct, adminUpdateStock, adminGetAwaitingCount } from '../../api/endpoints'
 import AdminLayout from './AdminLayout'
 import Button from '../../components/ui/Button'
 
@@ -16,7 +16,8 @@ export default function AdminStock() {
   const [errorMsg, setErrorMsg] = useState('')
   const [genCount, setGenCount] = useState('10')
   const [genPrefix, setGenPrefix] = useState('')
-  
+  const [awaitingCount, setAwaitingCount] = useState(0)
+
   // Inline edit state
   const [editingId, setEditingId] = useState(null)
   const [editVal, setEditVal] = useState('')
@@ -29,9 +30,14 @@ export default function AdminStock() {
       .finally(() => setLoading(false))
   }
 
+  const loadAwaitingCount = () => {
+    adminGetAwaitingCount(id).then(({ data }) => setAwaitingCount(data.count)).catch(() => {})
+  }
+
   useEffect(() => {
     adminGetProduct(id).then(({ data: p }) => setProduct(p))
     load()
+    loadAwaitingCount()
   }, [id])
 
   const handleGenerate = () => {
@@ -77,6 +83,7 @@ export default function AdminStock() {
       setMsg(res.message)
       setText('')
       load(1)
+      loadAwaitingCount()
     } catch (err) {
       setErrorMsg(err.response?.data?.error || 'Failed to add stock.')
     } finally {
@@ -138,6 +145,11 @@ export default function AdminStock() {
         <span className="rounded bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-400 capitalize">
           Type: {product?.product_type?.replace('_', ' ')}
         </span>
+        {awaitingCount > 0 && (
+          <span className="rounded-full bg-orange-500/10 border border-orange-500/20 px-2.5 py-0.5 text-xs font-semibold text-orange-400">
+            ⏳ {awaitingCount} order{awaitingCount > 1 ? 's' : ''} waiting on this stock
+          </span>
+        )}
       </div>
 
       <div className="grid gap-8 lg:grid-cols-2">

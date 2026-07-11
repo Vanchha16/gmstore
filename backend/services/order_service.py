@@ -7,7 +7,7 @@ from models.cart import Cart
 from models.payment import Payment
 from models.product import Product
 from models.stock_item import StockItem
-from services.inventory_service import reserve_stock
+from services.inventory_service import reserve_or_await_stock
 
 
 def generate_order_number():
@@ -51,14 +51,8 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
 
     # Process and reserve stock items
     for item in cart.items:
-        # Reserve stock (only if not pre-order, as coming_soon products don't have active stock)
-        # Note: If it's a pre-order, we still create order_items but don't allocate stock items yet.
-        reserved_items = []
-        if not is_preorder:
-            reserved_items = reserve_stock(item.product_id, item.qty)
-
-        # Create Order Items
         if is_preorder:
+            # coming_soon products don't have active stock — no allocation attempted yet.
             order_item = OrderItem(
                 order_id=order.id,
                 product_id=item.product_id,
@@ -69,7 +63,10 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
             )
             db.session.add(order_item)
         else:
-            # We link each quantity to a specific reserved stock item
+            # Reserve whatever stock is actually available; any shortfall becomes an
+            # awaiting_stock line the admin sources after payment (on-demand flow).
+            reserved_items, missing_qty = reserve_or_await_stock(item.product_id, item.qty)
+
             for r_item in reserved_items:
                 r_item.order_id = order.id  # Link stock item to order
                 order_item = OrderItem(
@@ -79,6 +76,17 @@ def create_order_from_cart(user_id, cart_id, payment_provider="mock", payment_me
                     unit_price=item.unit_price,
                     qty=1,  # Individual allocation per stock item
                     stock_item_id=r_item.id
+                )
+                db.session.add(order_item)
+
+            for _ in range(missing_qty):
+                order_item = OrderItem(
+                    order_id=order.id,
+                    product_id=item.product_id,
+                    title_snapshot=item.product.title,
+                    unit_price=item.unit_price,
+                    qty=1,
+                    stock_item_id=None
                 )
                 db.session.add(order_item)
 
@@ -108,7 +116,7 @@ def mark_order_paid(order_id, provider_txn_id, raw_response=None):
     if not order:
         raise ValueError("Order not found.")
 
-    if order.status in ("paid", "fulfilled"):
+    if order.status in ("awaiting_stock", "paid", "fulfilled"):
         return order
 
     payment = Payment.query.filter_by(order_id=order_id).first()
@@ -118,8 +126,17 @@ def mark_order_paid(order_id, provider_txn_id, raw_response=None):
         payment.raw_response = raw_response
         payment.updated_at = datetime.now(timezone.utc)
 
-    order.status = "paid"
+    order.status = "awaiting_stock" if order.needs_sourcing else "paid"
     order.paid_at = datetime.now(timezone.utc)
+
+    # Payment succeeded — these stock items are now genuinely allocated to this order,
+    # not a temporary pre-payment hold. Clear the 15-min reservation timeout so the
+    # stale-reservation sweep can't reclaim them while the order sits waiting on
+    # admin delivery (which can legitimately take much longer than 15 minutes).
+    for item in order.items:
+        if item.stock_item and item.stock_item.reserved_until is not None:
+            item.stock_item.reserved_until = None
+
     db.session.commit()
 
     # Notify admin to process this order

@@ -7,6 +7,7 @@ import { useToast } from '../../context/ToastContext'
 
 const STATUS_COLORS = {
   pending_payment: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+  awaiting_stock: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
   paid: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
   fulfilled: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
   cancelled: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
@@ -121,6 +122,7 @@ export default function AdminOrders() {
         >
           <option value="">All statuses</option>
           <option value="pending_payment">Pending Payment</option>
+          <option value="awaiting_stock">Awaiting Stock</option>
           <option value="paid">Deliver</option>
           <option value="fulfilled">Fulfilled</option>
           <option value="cancelled">Cancelled</option>
@@ -175,7 +177,7 @@ export default function AdminOrders() {
                       ✦ Deliver
                     </button>
                   )}
-                  {(order.status === 'paid' || order.status === 'fulfilled') && (
+                  {(order.status === 'paid' || order.status === 'fulfilled' || order.status === 'awaiting_stock') && (
                     <button
                       onClick={() => requestRefund(order.id, order)}
                       disabled={actionLoading === order.id}
@@ -186,7 +188,7 @@ export default function AdminOrders() {
                       }`}
                       title={order.delivery_confirmed ? 'Delivery confirmed by customer (cannot refund)' : ''}
                     >
-                      Refund
+                      {order.status === 'awaiting_stock' ? 'Cancel & Refund' : 'Refund'}
                     </button>
                   )}
                   {order.status === 'pending_payment' && (
@@ -229,7 +231,14 @@ export default function AdminOrders() {
                     <div className="space-y-1.5">
                       {order.items.map(item => (
                         <div key={item.id} className="flex justify-between text-xs">
-                          <span className="text-slate-300">{item.title_snapshot}</span>
+                          <span className="text-slate-300">
+                            {item.title_snapshot}
+                            {!item.stock_item_id && !order.is_preorder && (
+                              <span className="ml-2 rounded-full bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[9px] font-semibold text-orange-400">
+                                needs sourcing — add stock on the product's Stock page
+                              </span>
+                            )}
+                          </span>
                           <span className="font-mono text-slate-400">${parseFloat(item.unit_price).toFixed(2)} × {item.qty}</span>
                         </div>
                       ))}

@@ -5,7 +5,7 @@ export default function StatusBadge({ product }) {
     return <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-medium text-amber-400">Coming Soon</span>
   }
   if (status === 'active' && available_stock === 0) {
-    return <span className="rounded-full bg-red-500/20 px-2.5 py-0.5 text-xs font-medium text-red-400">Sold Out</span>
+    return <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-xs font-medium text-amber-400">⏳ Sourced on Demand</span>
   }
   if (product.is_featured || product.sold_count > 0) {
     return (

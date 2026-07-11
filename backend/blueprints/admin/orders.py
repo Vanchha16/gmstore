@@ -5,6 +5,7 @@ from models.payment import Payment
 from utils.decorators import role_required
 from services.order_service import fulfill_order
 from services.wallet_service import credit_wallet
+from services.inventory_service import release_order_stock
 
 admin_orders_bp = Blueprint("admin_orders", __name__, url_prefix="/api/v1/admin/orders")
 
@@ -59,7 +60,7 @@ def update_order(order_id):
     data = request.get_json(silent=True) or {}
     new_status = data.get("status")
 
-    allowed = {"pending_payment", "paid", "fulfilled", "cancelled", "refunded", "failed"}
+    allowed = {"pending_payment", "awaiting_stock", "paid", "fulfilled", "cancelled", "refunded", "failed"}
     if new_status and new_status not in allowed:
         return jsonify({"error": f"Invalid status '{new_status}'."}), 400
 
@@ -96,13 +97,19 @@ def refund_order(order_id):
     order = Order.query.get_or_404(order_id)
     if order.delivery_confirmed:
         return jsonify({"error": "Cannot refund an order after delivery is confirmed."}), 400
-    if order.status not in ("paid", "fulfilled"):
-        return jsonify({"error": "Only paid or fulfilled orders can be refunded."}), 400
+    if order.status not in ("paid", "fulfilled", "awaiting_stock"):
+        return jsonify({"error": "Only paid, fulfilled, or awaiting-stock orders can be refunded."}), 400
 
+    was_awaiting_stock = order.status == "awaiting_stock"
     order.status = "refunded"
     payment = Payment.query.filter_by(order_id=order_id).first()
     if payment:
         payment.status = "refunded"
+
+    if was_awaiting_stock:
+        # Nothing was actually delivered — release any partial stock hold back to the pool
+        # and null out the unlinked lines so this cancellation doesn't leave dangling refs.
+        release_order_stock(order.id)
 
     credit_wallet(order.user_id, order.total, type="refund",
                   order_id=order.id, reference=f"Refund for order {order.order_number}")
