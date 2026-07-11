@@ -1,0 +1,204 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply m-0 bg-slate-950 text-slate-300 antialiased;
+    font-family: system-ui, 'Segoe UI', sans-serif;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+}
+
+/* Premium Animations & Glow Effects */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.premium-card {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.premium-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: 0 12px 28px -5px rgba(139, 92, 246, 0.15), 0 8px 16px -6px rgba(139, 92, 246, 0.15);
+}
+
+.sheen-btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sheen-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(255, 255, 255, 0.15),
+    transparent
+  );
+  transform: skewX(-25deg);
+  transition: 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sheen-btn:hover::after {
+  left: 125%;
+}
+
+/* Multi-layered premium loading spinner */
+.premium-spinner {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  border: 4px solid transparent;
+  border-radius: 50%;
+  border-color: rgba(139, 92, 246, 0.15) rgba(139, 92, 246, 0.15);
+  animation: spinner-outer 1.6s linear infinite;
+}
+
+.premium-spinner::before,
+.premium-spinner::after {    
+  content: "";
+  grid-area: 1/1;
+  margin: 2px;
+  border: inherit;
+  border-radius: 50%;
+}
+
+.premium-spinner::before {
+  border-color: rgba(16, 185, 129, 0.85) transparent;
+  animation: spinner-inner 2s infinite;
+}
+
+.premium-spinner::after {
+  border-color: transparent rgba(139, 92, 246, 0.85);
+  animation: spinner-inner 1s infinite reverse;
+}
+
+@keyframes spinner-outer {
+  100% { transform: rotate(1turn); }
+}
+
+@keyframes spinner-inner {
+  100% { transform: rotate(2turn); }
+}
+
+/* Premium Login/Register Floating Background Glow */
+.auth-glow-container {
+  position: relative;
+  overflow: hidden;
+  background-color: #020617; /* Dark slate-950 background */
+}
+
+.auth-glow-bubble-1 {
+  position: absolute;
+  top: -15%;
+  left: -15%;
+  width: 480px;
+  height: 480px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.28) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 75%);
+  filter: blur(55px);
+  pointer-events: none;
+  animation: drift-1 14s ease-in-out infinite alternate;
+}
+
+.auth-glow-bubble-2 {
+  position: absolute;
+  bottom: -20%;
+  right: -15%;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.24) 0%, rgba(16, 185, 129, 0.05) 50%, transparent 75%);
+  filter: blur(55px);
+  pointer-events: none;
+  animation: drift-2 18s ease-in-out infinite alternate;
+}
+
+@keyframes drift-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(80px, 50px) scale(1.1); }
+  100% { transform: translate(-40px, 90px) scale(0.95); }
+}
+
+@keyframes drift-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-90px, -60px) scale(1.15); }
+  100% { transform: translate(30px, -80px) scale(0.9); }
+}
+
+/* Beautiful dynamic slide-up keyframe for the auth card */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-card-entrance {
+  animation: cardEntrance 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Success checkmark drawing animation */
+.success-checkmark {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto;
+}
+
+.success-checkmark-circle {
+  stroke-dasharray: 166;
+  stroke-dashoffset: 166;
+  stroke-width: 3;
+  stroke-miterlimit: 10;
+  stroke: #10b981;
+  fill: none;
+  animation: stroke 0.6s cubic-bezier(0.65, 0, 0.45, 1) forwards;
+}
+
+.success-checkmark-check {
+  transform-origin: 50% 50%;
+  stroke-dasharray: 48;
+  stroke-dashoffset: 48;
+  stroke-width: 4;
+  stroke: #10b981;
+  fill: none;
+  animation: stroke 0.3s cubic-bezier(0.65, 0, 0.45, 1) 0.6s forwards;
+}
+
+@keyframes stroke {
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+
+
