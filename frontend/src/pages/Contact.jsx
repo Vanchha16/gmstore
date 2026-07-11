@@ -5,6 +5,7 @@ import Container from '../components/layout/Container'
 export default function Contact() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(false)
@@ -18,10 +19,11 @@ export default function Contact() {
     setSuccess(null)
 
     try {
-      const { data } = await client.post('/contact', { name, email, subject, message })
+      const { data } = await client.post('/contact', { name, email, phone, subject, message })
       setSuccess(data.message || 'Your message has been sent successfully!')
       setName('')
       setEmail('')
+      setPhone('')
       setSubject('')
       setMessage('')
     } catch (err) {
@@ -76,6 +78,17 @@ export default function Contact() {
                   className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-violet-500 transition"
                 />
               </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-slate-400">Phone Number <span className="text-slate-600">(optional)</span></label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="e.g. 012 345 678"
+                className="w-full rounded-xl border border-slate-800 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 outline-none focus:border-violet-500 transition"
+              />
             </div>
 
             <div>

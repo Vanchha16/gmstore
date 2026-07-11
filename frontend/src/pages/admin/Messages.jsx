@@ -60,6 +60,9 @@ export default function AdminMessages() {
                     {!msg.is_read && <span className="h-2 w-2 rounded-full bg-violet-500 flex-shrink-0" />}
                     <span className="font-semibold text-slate-100">{msg.name}</span>
                     <a href={`mailto:${msg.email}`} className="text-sm text-violet-400 hover:underline">{msg.email}</a>
+                    {msg.phone && (
+                      <a href={`tel:${msg.phone}`} className="text-sm text-emerald-400 hover:underline">{msg.phone}</a>
+                    )}
                     <span className="text-xs text-slate-600">{new Date(msg.created_at + 'Z').toLocaleString()}</span>
                   </div>
                   <p className="mt-1 text-sm font-medium text-slate-300">{msg.subject}</p>
