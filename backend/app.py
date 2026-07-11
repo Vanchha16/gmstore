@@ -66,19 +66,11 @@ def create_app(env: str | None = None) -> Flask:
 
     socketio.init_app(app)
 
-    # Background Scheduler to clean stale reservations periodically
+    # Background Scheduler for periodic housekeeping jobs
     if os.environ.get("WERKZEUG_RUN_MAIN") == "true" or not app.debug:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from services.inventory_service import release_stale_reservations
 
         scheduler = BackgroundScheduler()
-        
-        def run_cleanup():
-            with app.app_context():
-                try:
-                    release_stale_reservations()
-                except Exception as e:
-                    app.logger.error("Failed to release stale reservations: %s", str(e))
 
         def run_coming_soon_flip():
             with app.app_context():
@@ -141,8 +133,6 @@ def create_app(env: str | None = None) -> Flask:
                 except Exception as e:
                     app.logger.error("Wallet top-up sweep failed: %s", str(e))
 
-        # Check every 60 seconds for stale stock holds
-        scheduler.add_job(func=run_cleanup, trigger="interval", seconds=60)
         # Check every 5 minutes for coming_soon products whose release_date has passed
         scheduler.add_job(func=run_coming_soon_flip, trigger="interval", minutes=5)
         # Fallback: mark Bakong orders paid even if the buyer's browser tab isn't open/polling

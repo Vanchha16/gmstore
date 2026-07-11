@@ -127,8 +127,8 @@ export default function Navbar() {
                         <p className="text-xs font-bold text-violet-400">
                           {product.currency || '$'}{product.price.toFixed(2)}
                         </p>
-                        <p className={`text-[9px] font-semibold ${product.available_stock > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                          {product.available_stock > 0 ? `${product.available_stock} Instock` : 'Sold Out'}
+                        <p className={`text-[9px] font-semibold ${product.is_available ? 'text-emerald-400' : 'text-red-400'}`}>
+                          {product.is_available ? 'Available' : 'Not Available'}
                         </p>
                       </div>
                     </button>

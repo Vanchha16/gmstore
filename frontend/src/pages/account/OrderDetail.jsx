@@ -4,6 +4,7 @@ import client from '../../api/client'
 import { cancelOrder } from '../../api/endpoints'
 import { useCart } from '../../context/CartContext'
 import AccountLayout from './AccountLayout'
+import { formatOrderStatus } from '../../utils/orderStatus'
 
 const STEPS = [
   {
@@ -81,7 +82,7 @@ function OrderTracker({ status, paidAt, fulfilledAt }) {
                                          'bg-slate-700 text-slate-400'
         }`}>
           {status === 'fulfilled' ? 'Delivered' :
-           status === 'paid' ? 'Processing' :
+           status === 'paid' ? 'Pending Delivery' :
            status === 'pending_payment' ? 'Awaiting Payment' : status}
         </span>
       </div>
@@ -222,7 +223,7 @@ export default function OrderDetail() {
   }
 
   const handleCancel = async () => {
-    if (!confirm('Cancel this order and release the stock reservation?')) return
+    if (!confirm('Cancel this order?')) return
     setCancelling(true)
     try {
       await cancelOrder(order.id)
@@ -274,7 +275,7 @@ export default function OrderDetail() {
           <h2 className="text-2xl font-bold text-slate-100">Order #{order.order_number}</h2>
         </div>
         <span className={`rounded-xl border px-3 py-1 text-xs font-semibold uppercase ${statusStyle}`}>
-          {order.status.replace('_', ' ')}
+          {formatOrderStatus(order.status)}
         </span>
       </div>
 
@@ -307,6 +308,17 @@ export default function OrderDetail() {
                   Awaiting payment confirmation.
                 </div>
               ) : null}
+
+              {order.status === 'fulfilled' && item.product?.slug && (
+                <div className="mt-3 flex justify-end">
+                  <Link
+                    to={`/products/${item.product.slug}#write-review`}
+                    className="text-xs font-semibold text-violet-400 hover:text-violet-300 hover:underline transition flex items-center gap-1"
+                  >
+                    ★ Write a Review
+                  </Link>
+                </div>
+              )}
             </div>
           ))}
         </div>

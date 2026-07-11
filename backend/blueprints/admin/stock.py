@@ -8,6 +8,26 @@ from utils.security import encrypt_payload
 admin_stock_bp = Blueprint("admin_stock", __name__, url_prefix="/api/v1/admin/products")
 
 
+# GET /api/v1/admin/products/<int:product_id>/awaiting-count
+@admin_stock_bp.get("/<int:product_id>/awaiting-count")
+@role_required("admin")
+def get_awaiting_count(product_id):
+    """Number of paid (pending-delivery) order lines still needing this product delivered."""
+    from models.order import Order
+    from models.order_item import OrderItem
+    count = (
+        OrderItem.query
+        .join(Order, OrderItem.order_id == Order.id)
+        .filter(
+            OrderItem.product_id == product_id,
+            OrderItem.stock_item_id.is_(None),
+            Order.status == "paid",
+        )
+        .count()
+    )
+    return jsonify({"count": count}), 200
+
+
 # POST /api/v1/admin/products/<int:product_id>/stock  — bulk add
 @admin_stock_bp.post("/<int:product_id>/stock")
 @role_required("admin")
@@ -39,7 +59,9 @@ def add_stock(product_id):
         items.append(item)
 
     db.session.commit()
-    return jsonify({"added": len(items), "message": f"Successfully added {len(items)} stock items."}), 201
+
+    message = f"Successfully added {len(items)} stock items to inventory."
+    return jsonify({"added": len(items), "message": message}), 201
 
 
 # GET /api/v1/admin/products/<int:product_id>/stock
@@ -107,19 +129,3 @@ def delete_stock_item(item_id):
     db.session.delete(item)
     db.session.commit()
     return jsonify({"message": "Stock item deleted."}), 200
-
-
-# POST /api/v1/admin/stock/<int:item_id>/release  — force-release a reserved item
-@admin_stock_bp.post("/stock/<int:item_id>/release")
-@role_required("admin")
-def force_release_stock(item_id):
-    item = StockItem.query.get_or_404(item_id)
-    if item.status != "reserved":
-        return jsonify({"error": "Only reserved items can be force-released."}), 400
-    from models.order_item import OrderItem
-    item.status = "available"
-    item.reserved_until = None
-    item.order_id = None
-    OrderItem.query.filter_by(stock_item_id=item_id).update({"stock_item_id": None}, synchronize_session="fetch")
-    db.session.commit()
-    return jsonify({"message": "Stock item released back to available.", "item": item.to_dict()}), 200

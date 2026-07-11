@@ -44,13 +44,8 @@ export default function ProductCard({ product }) {
           <PriceTag price={product.price} compareAt={product.compare_at_price} currency={product.currency} />
         </div>
 
-        {/* Flex spacer to align stock counts to bottom */}
+        {/* Flex spacer pushes badges/title to the top */}
         <div className="flex-grow"></div>
-
-        {/* Stock counts */}
-        {typeof product.available_stock === 'number' && product.status === 'active' && (
-          <p className="text-xs text-slate-500 font-medium pt-1">{product.available_stock} in stock</p>
-        )}
       </div>
     </Link>
   )

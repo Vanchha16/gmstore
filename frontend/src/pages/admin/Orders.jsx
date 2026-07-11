@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import AdminLayout from './AdminLayout'
-import { adminListOrders, adminUpdateOrder, adminRefundOrder, adminDeliverOrder } from '../../api/endpoints'
+import { adminListOrders, adminUpdateOrder, adminRefundOrder } from '../../api/endpoints'
 import LoadingSpinner from '../../components/ui/LoadingSpinner'
 import ConfirmModal from '../../components/ui/ConfirmModal'
+import DeliverOrderModal from './DeliverOrderModal'
 import { useToast } from '../../context/ToastContext'
+import { formatOrderStatus } from '../../utils/orderStatus'
 
 const STATUS_COLORS = {
   pending_payment: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
@@ -24,7 +26,8 @@ export default function AdminOrders() {
   const [search, setSearch] = useState('')
   const [actionLoading, setActionLoading] = useState(null)
   const [expanded, setExpanded] = useState(null)
-  const [confirmAction, setConfirmAction] = useState(null) // { type: 'deliver' | 'refund', orderId }
+  const [confirmAction, setConfirmAction] = useState(null) // { type: 'refund', orderId }
+  const [deliverOrderId, setDeliverOrderId] = useState(null)
 
   const limit = 20
 
@@ -58,8 +61,6 @@ export default function AdminOrders() {
     }
   }
 
-  const requestDeliver = (orderId) => setConfirmAction({ type: 'deliver', orderId })
-
   const requestRefund = (orderId, order) => {
     if (order.delivery_confirmed) {
       toast('This order delivery is confirmed by the customer and cannot be refunded.', 'warning')
@@ -73,21 +74,22 @@ export default function AdminOrders() {
     const { type, orderId } = confirmAction
     setActionLoading(orderId)
     try {
-      if (type === 'deliver') {
-        const { data } = await adminDeliverOrder(orderId)
-        setOrders(prev => prev.map(o => o.id === orderId ? data.order : o))
-        toast('Order delivered to buyer.', 'success')
-      } else if (type === 'refund') {
+      if (type === 'refund') {
         const { data } = await adminRefundOrder(orderId)
         setOrders(prev => prev.map(o => o.id === orderId ? data.order : o))
         toast('Order marked as refunded.', 'success')
       }
     } catch (err) {
-      toast(err.response?.data?.error || `${type === 'deliver' ? 'Delivery' : 'Refund'} failed`, 'error')
+      toast(err.response?.data?.error || 'Refund failed', 'error')
     } finally {
       setActionLoading(null)
       setConfirmAction(null)
     }
+  }
+
+  const handleDelivered = (order) => {
+    setOrders(prev => prev.map(o => o.id === order.id ? order : o))
+    setDeliverOrderId(null)
   }
 
   const pages = Math.ceil(total / limit)
@@ -152,7 +154,7 @@ export default function AdminOrders() {
 
                 <div className="flex items-center gap-2">
                   <span className={`rounded-lg border px-2 py-0.5 text-[10px] font-semibold ${STATUS_COLORS[order.status] || ''}`}>
-                    {order.status.replace('_', ' ')}
+                    {formatOrderStatus(order.status)}
                   </span>
                   <span className="font-mono text-sm font-bold text-emerald-400">
                     ${parseFloat(order.total).toFixed(2)}
@@ -168,7 +170,7 @@ export default function AdminOrders() {
                   </button>
                   {order.status === 'paid' && (
                     <button
-                      onClick={() => requestDeliver(order.id)}
+                      onClick={() => setDeliverOrderId(order.id)}
                       disabled={actionLoading === order.id}
                       className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-400 hover:bg-emerald-500/20 transition disabled:opacity-50 animate-pulse"
                     >
@@ -229,7 +231,14 @@ export default function AdminOrders() {
                     <div className="space-y-1.5">
                       {order.items.map(item => (
                         <div key={item.id} className="flex justify-between text-xs">
-                          <span className="text-slate-300">{item.title_snapshot}</span>
+                          <span className="text-slate-300">
+                            {item.title_snapshot}
+                            {!item.stock_item_id && !order.is_preorder && (
+                              <span className="ml-2 inline-flex items-center rounded-full bg-orange-500/10 border border-orange-500/20 px-2 py-0.5 text-[9px] font-semibold text-orange-400">
+                                needs delivery
+                              </span>
+                            )}
+                          </span>
                           <span className="font-mono text-slate-400">${parseFloat(item.unit_price).toFixed(2)} × {item.qty}</span>
                         </div>
                       ))}
@@ -285,18 +294,22 @@ export default function AdminOrders() {
 
       <ConfirmModal
         open={!!confirmAction}
-        title={confirmAction?.type === 'deliver' ? 'Deliver this order?' : 'Refund this order?'}
-        message={
-          confirmAction?.type === 'deliver'
-            ? 'This will mark the order as fulfilled, reveal the credentials to the buyer, and email them.'
-            : 'This will mark the order as refunded. This cannot be undone.'
-        }
-        confirmLabel={confirmAction?.type === 'deliver' ? 'Deliver' : 'Refund'}
-        tone={confirmAction?.type === 'deliver' ? 'default' : 'danger'}
+        title="Refund this order?"
+        message="This will mark the order as refunded. This cannot be undone."
+        confirmLabel="Refund"
+        tone="danger"
         loading={actionLoading === confirmAction?.orderId}
         onConfirm={runConfirmedAction}
         onCancel={() => setConfirmAction(null)}
       />
+
+      {deliverOrderId && (
+        <DeliverOrderModal
+          orderId={deliverOrderId}
+          onClose={() => setDeliverOrderId(null)}
+          onDelivered={handleDelivered}
+        />
+      )}
     </AdminLayout>
   )
 }

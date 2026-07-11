@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './routes/ProtectedRoute'
@@ -46,11 +46,14 @@ import PaymentKhqr from './pages/PaymentKhqr'
 import OrderSuccess from './pages/OrderSuccess'
 
 function Layout({ children }) {
+  const location = useLocation()
+  const isAdminPath = location.pathname.startsWith('/admin')
+
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
       <Navbar />
       <div className="flex-1">{children}</div>
-      <Footer />
+      {!isAdminPath && <Footer />}
       <ChatWidget />
     </div>
   )

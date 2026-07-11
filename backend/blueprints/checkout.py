@@ -7,7 +7,7 @@ from models.order import Order
 from models.cart import Cart
 from services.order_service import create_order_from_cart, mark_order_paid, check_and_fulfill_bakong_order
 from services.payway_service import get_payment_details
-from services.inventory_service import release_order_stock, _refund_wallet_hold
+from services.inventory_service import _refund_wallet_hold
 from services.wallet_service import get_or_create_wallet, debit_wallet
 
 checkout_bp = Blueprint("checkout", __name__, url_prefix="/api/v1")
@@ -28,11 +28,10 @@ def checkout():
     if not cart or not cart.items:
         return jsonify({"error": "Your cart is empty."}), 400
 
-    # Release stock from any previous pending_payment orders so the same
-    # items don't stay locked if the user abandoned an earlier QR page.
+    # Cancel any previous pending_payment orders so the buyer isn't double-billed
+    # if they abandoned an earlier QR page and started a new checkout.
     stale = Order.query.filter_by(user_id=user_id, status="pending_payment").all()
     for old in stale:
-        release_order_stock(old.id)
         _refund_wallet_hold(old)
         old.status = "cancelled"
     if stale:
@@ -49,7 +48,6 @@ def checkout():
                 debit_wallet(user_id, order.total, type="purchase",
                               order_id=order.id, reference=order.order_number)
             except ValueError as e:
-                release_order_stock(order.id)
                 order.status = "cancelled"
                 db.session.commit()
                 return jsonify({"error": str(e)}), 400
@@ -152,7 +150,6 @@ def cancel_order_route(order_id):
         return jsonify({"error": "Only pending_payment orders can be cancelled."}), 400
 
     try:
-        released = release_order_stock(order.id)
         _refund_wallet_hold(order)
         order.status = "cancelled"
 
@@ -163,7 +160,7 @@ def cancel_order_route(order_id):
 
         db.session.commit()
         return jsonify({
-            "message": f"Order cancelled. {released} stock item(s) released.",
+            "message": "Order cancelled.",
             "order_id": order.id,
         }), 200
     except Exception as e:
