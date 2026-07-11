@@ -242,8 +242,12 @@ def forgot_password():
     email = (data.get("email") or "").strip().lower()
 
     user = User.query.filter_by(email=email).first()
-    # Always 200 to avoid user enumeration
-    if user and user.is_verified:
+    # Always 200 to avoid user enumeration. Note: intentionally NOT gated on
+    # is_verified — an account that registered but never finished OTP verify
+    # (expired code, closed tab, etc.) would otherwise be a dead end, since
+    # register() also blocks re-signup for any existing email. Proving
+    # ownership of the inbox via this code is verification enough on its own.
+    if user:
         ok, _ = otp_service.can_resend(user.id, "reset_password")
         if ok:
             code = otp_service.create_otp(user.id, "reset_password")
@@ -281,6 +285,7 @@ def reset_password():
         return jsonify({"error": msg}), 400
 
     user.password_hash = bcrypt.hash(new_password)
+    user.is_verified = True  # proving the emailed code = proving inbox ownership
     user.updated_at = datetime.now(timezone.utc)
     db.session.commit()
     return jsonify({"message": "Password reset successfully."}), 200
