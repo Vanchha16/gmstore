@@ -28,7 +28,11 @@
 }
 
 .animate-fade-in {
-  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  /* No `forwards` fill-mode: the end keyframe (opacity:1, transform:none) already
+     matches the element's resting state, and a lingering non-none transform would
+     otherwise make this element a containing block for any `position: fixed`
+     descendant (e.g. modals), breaking their viewport-relative centering. */
+  animation: fadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .premium-card {
