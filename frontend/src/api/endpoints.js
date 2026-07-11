@@ -57,6 +57,8 @@ export const checkout = (data) => client.post('/checkout', data)
 export const getOrderPaymentStatus = (orderId) => client.get(`/orders/${orderId}/payment-status`)
 export const mockPay = (data) => client.post('/payment/mock/pay', data)
 export const cancelOrder = (orderId) => client.post(`/orders/${orderId}/cancel`)
+export const applyPromoCode = (code) => client.post('/cart/apply-promo', { code })
+export const removePromoCode = () => client.delete('/cart/apply-promo')
 
 // Admin users
 export const adminListUsers = (params) => client.get('/admin/users', { params })
@@ -80,3 +82,9 @@ export const getWalletTopupStatus = (topupId) => client.get(`/me/wallet/topup/${
 export const adminListWallets = (params) => client.get('/admin/wallets', { params })
 export const adminGetUserWallet = (userId, params) => client.get(`/admin/wallets/${userId}`, { params })
 export const adminAdjustWallet = (userId, data) => client.post(`/admin/wallets/${userId}/adjust`, data)
+
+// Admin promo codes
+export const adminListPromoCodes = (params) => client.get('/admin/promo-codes', { params })
+export const adminCreatePromoCode = (data) => client.post('/admin/promo-codes', data)
+export const adminUpdatePromoCode = (id, data) => client.patch(`/admin/promo-codes/${id}`, data)
+export const adminDeletePromoCode = (id) => client.delete(`/admin/promo-codes/${id}`)

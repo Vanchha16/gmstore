@@ -5,12 +5,15 @@ import { checkout, getWallet } from '../api/endpoints'
 import Container from '../components/layout/Container'
 
 export default function Checkout() {
-  const { cart, loading: cartLoading } = useCart()
+  const { cart, loading: cartLoading, applyPromo, removePromo } = useCart()
   const [method, setMethod] = useState('khqr')
   const [useWallet, setUseWallet] = useState(false)
   const [walletBalance, setWalletBalance] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [promoInput, setPromoInput] = useState('')
+  const [promoLoading, setPromoLoading] = useState(false)
+  const [promoLocalError, setPromoLocalError] = useState(null)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -18,9 +21,39 @@ export default function Checkout() {
   }, [])
 
   const items = cart?.items || []
-  const subtotal = items.reduce((sum, item) => sum + item.unit_price * item.qty, 0)
-  const total = subtotal
+  // The backend is the source of truth for subtotal/discount/total — it re-validates
+  // the promo code server-side, so the frontend only ever displays what it returns.
+  const totals = cart?.totals || { subtotal: 0, discount: 0, total: 0, promo_code: null, promo_error: null }
+  const subtotal = totals.subtotal
+  const discount = totals.discount
+  const total = totals.total
   const canPayFullyWithWallet = walletBalance >= total && total > 0
+
+  const handleApplyPromo = async () => {
+    if (!promoInput.trim()) return
+    setPromoLoading(true)
+    setPromoLocalError(null)
+    try {
+      await applyPromo(promoInput.trim())
+      setPromoInput('')
+    } catch (err) {
+      setPromoLocalError(err.message)
+    } finally {
+      setPromoLoading(false)
+    }
+  }
+
+  const handleRemovePromo = async () => {
+    setPromoLoading(true)
+    setPromoLocalError(null)
+    try {
+      await removePromo()
+    } catch (err) {
+      setPromoLocalError(err.message)
+    } finally {
+      setPromoLoading(false)
+    }
+  }
 
   const handleCheckout = async () => {
     setLoading(true)
@@ -187,6 +220,46 @@ export default function Checkout() {
                 ))}
               </div>
             </div>
+
+            {/* Promo Code */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6">
+              <h2 className="mb-4 text-lg font-semibold text-slate-200">Promo Code</h2>
+              {totals.promo_code ? (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3">
+                  <div>
+                    <span className="font-mono text-sm font-bold text-emerald-400">{totals.promo_code.code}</span>
+                    <span className="ml-2 text-xs text-emerald-300">-${discount.toFixed(2)} applied</span>
+                  </div>
+                  <button
+                    onClick={handleRemovePromo}
+                    disabled={promoLoading}
+                    className="text-xs font-semibold text-slate-400 hover:text-red-400 transition disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    value={promoInput}
+                    onChange={(e) => setPromoInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleApplyPromo()}
+                    placeholder="Enter promo code"
+                    className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 outline-none focus:border-violet-500"
+                  />
+                  <button
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || !promoInput.trim()}
+                    className="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-500 transition disabled:opacity-50"
+                  >
+                    {promoLoading ? '…' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {(promoLocalError || totals.promo_error) && (
+                <p className="mt-2 text-xs text-red-400">{promoLocalError || totals.promo_error}</p>
+              )}
+            </div>
           </div>
 
           {/* Checkout billing column */}
@@ -199,6 +272,12 @@ export default function Checkout() {
                   <span>Subtotal</span>
                   <span className="font-mono text-slate-200">${subtotal.toFixed(2)}</span>
                 </div>
+                {discount > 0 && (
+                  <div className="flex justify-between text-emerald-400">
+                    <span>Discount {totals.promo_code ? `(${totals.promo_code.code})` : ''}</span>
+                    <span className="font-mono">-${discount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>Tax & Fees</span>
                   <span className="font-mono text-slate-200">$0.00</span>

@@ -333,7 +333,7 @@ export default function OrderDetail() {
                 <span className="font-mono text-slate-200">${parseFloat(order.subtotal).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
-                <span>Discount</span>
+                <span>Discount {order.promo_code ? `(${order.promo_code.code})` : ''}</span>
                 <span className="font-mono text-emerald-400">-${parseFloat(order.discount).toFixed(2)}</span>
               </div>
               <div className="flex justify-between border-t border-slate-800 pt-2 font-semibold text-slate-100">

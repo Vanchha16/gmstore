@@ -29,6 +29,7 @@ import AdminReviews from './pages/admin/Reviews'
 import AdminOrders from './pages/admin/Orders'
 import AdminUsers from './pages/admin/Users'
 import AdminWallets from './pages/admin/Wallets'
+import AdminPromoCodes from './pages/admin/PromoCodes'
 import AdminChat from './pages/admin/Chat'
 import ChatWidget from './components/chat/ChatWidget'
 
@@ -93,6 +94,7 @@ export default function App() {
             <Route path="/admin/orders" element={<Layout><AdminRoute><AdminOrders /></AdminRoute></Layout>} />
             <Route path="/admin/users" element={<Layout><AdminRoute><AdminUsers /></AdminRoute></Layout>} />
             <Route path="/admin/wallets" element={<Layout><AdminRoute><AdminWallets /></AdminRoute></Layout>} />
+            <Route path="/admin/promo-codes" element={<Layout><AdminRoute><AdminPromoCodes /></AdminRoute></Layout>} />
             <Route path="/admin/chat" element={<Layout><AdminRoute><AdminChat /></AdminRoute></Layout>} />
 
             {/* Account */}
