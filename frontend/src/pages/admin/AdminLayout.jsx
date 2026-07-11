@@ -124,7 +124,10 @@ export default function AdminLayout({ children }) {
 
         {/* Content Area */}
         <main className="md:col-span-3">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 shadow-xl backdrop-blur-sm">
+          {/* No backdrop-blur here: it establishes a CSS containing block for any
+              position:fixed descendant, which breaks viewport-relative centering
+              for every modal rendered inside admin pages (Deliver, Confirm, etc.) */}
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 shadow-xl">
             {children}
           </div>
         </main>
